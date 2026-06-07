@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚽ ЧМ 2026 Прогнозы</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --card: #111827;
+    --card2: #1a2235;
+    --border: #1e2d45;
+    --accent: #e8c14a;
+    --accent2: #f97316;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --text: #f0f4ff;
+    --muted: #6b7a99;
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(135deg, #0d1b2e 0%, #1a2f4e 100%);
+    padding: 20px 16px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .logo span { color: var(--text); }
+  .user-badge {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .user-badge .score {
+    color: var(--accent);
+    font-size: 15px;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 8px;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0a0e1a;
+  }
+
+  /* ── PAGES ── */
+  .page { display: none; padding: 16px; padding-bottom: 40px; }
+  .page.active { display: block; }
+
+  /* ── MATCH CARD ── */
+  .match-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .match-card.has-prediction { border-color: #2a3d5e; }
+  .match-card.locked { opacity: 0.7; }
+
+  .match-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px 8px;
+  }
+  .match-type {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .match-deadline {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .match-deadline.soon { color: var(--accent2); }
+  .match-deadline.locked { color: var(--red); }
+
+  .teams-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 14px 12px;
+    gap: 8px;
+  }
+  .team-name {
+    flex: 1;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--text);
+    text-align: center;
+  }
+  .vs-badge {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .special-title {
+    font-size: 16px;
+    font-weight: 700;
+    padding: 4px 14px 12px;
+    color: var(--text);
+  }
+
+  /* Result badge */
+  .result-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 14px 12px;
+    padding: 6px 12px;
+    background: #1a2a1a;
+    border: 1px solid #2d4a2d;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--green);
+  }
+
+  /* ── PREDICTION FORM ── */
+  .pred-form {
+    border-top: 1px solid var(--border);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pred-input {
+    flex: 1;
+    background: var(--card2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+    text-align: center;
+  }
+  .pred-input:focus { border-color: var(--accent); }
+  .pred-input::placeholder { color: var(--muted); font-weight: 400; }
+  .pred-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .x2-btn {
+    background: var(--card2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .x2-btn.active {
+    background: linear-gradient(135deg, #f97316, #dc2626);
+    border-color: #f97316;
+    color: white;
+  }
+  .x2-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .save-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 900;
+    color: #0a0e1a;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .save-btn:active { transform: scale(0.95); }
+  .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Points chip */
+  .points-chip {
+    border-top: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .pred-preview {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .pred-preview .val { color: var(--text); font-weight: 700; }
+  .pred-preview .x2-tag {
+    background: linear-gradient(135deg, #f97316, #dc2626);
+    color: white;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .pts-value {
+    font-weight: 900;
+    font-size: 14px;
+  }
+  .pts-value.pos { color: var(--green); }
+  .pts-value.neg { color: var(--red); }
+
+  /* ── LEADERBOARD ── */
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .lb-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .lb-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-row.me { background: #0f1e35; }
+
+  .lb-rank {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    width: 28px;
+    text-align: center;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .lb-rank.gold { color: #fbbf24; }
+  .lb-rank.silver { color: #94a3b8; }
+  .lb-rank.bronze { color: #cd7c3a; }
+
+  .lb-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), #7c3aed);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .lb-name {
+    flex: 1;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .lb-pts {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .lb-pts-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    text-align: right;
+    line-height: 1.2;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1e2d45;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    z-index: 999;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  .toast.info { border-color: var(--accent); color: var(--accent); }
+
+  /* ── LOADING ── */
+  .loader {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── EMPTY STATE ── */
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-text { font-weight: 600; font-size: 15px; }
+
+  /* ── REGISTER ── */
+  .register-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+    padding: 24px;
+    text-align: center;
+    gap: 16px;
+  }
+  .register-icon { font-size: 60px; }
+  .register-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: 2px;
+    color: var(--accent);
+  }
+  .register-sub { color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .register-input {
+    width: 100%;
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    outline: none;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+  .register-input:focus { border-color: var(--accent); }
+  .register-btn {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 16px;
+    font-weight: 900;
+    color: #0a0e1a;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .register-btn:active { opacity: 0.8; }
+
+  /* ── REFRESH BTN ── */
+  .refresh-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+  }
+  .refresh-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+</style>
+</head>
+<body>
+
+<!-- REGISTER SCREEN -->
+<div id="register-screen" class="register-screen" style="display:none">
+  <div class="register-icon">⚽</div>
+  <div class="register-title">ЧМ 2026<br>Прогнозы</div>
+  <div class="register-sub">Введи своё имя чтобы участвовать в викторине</div>
+  <input class="register-input" id="name-input" type="text" placeholder="Твоё имя" maxlength="20">
+  <button class="register-btn" onclick="registerUser()">Присоединиться 🚀</button>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" style="display:none">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">ЧМ <span>2026</span></div>
+      <div class="user-badge">
+        <span id="user-name-badge">—</span>
+        <span class="score" id="user-score-badge">0 pts</span>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('predictions')">⚽ Прогнозы</button>
+      <button class="tab" onclick="switchTab('leaderboard')">🏆 Лидерборд</button>
+    </div>
+  </div>
+
+  <!-- PREDICTIONS PAGE -->
+  <div class="page active" id="page-predictions">
+    <div class="loader" id="matches-loader">
+      <div class="spinner"></div>
+      Загружаем матчи...
+    </div>
+    <div id="matches-list"></div>
+  </div>
+
+  <!-- LEADERBOARD PAGE -->
+  <div class="page" id="page-leaderboard">
+    <div class="refresh-row">
+      <button class="refresh-btn" onclick="loadLeaderboard()">↻ Обновить</button>
+    </div>
+    <div class="section-title">Таблица</div>
+    <div class="loader" id="lb-loader">
+      <div class="spinner"></div>
+      Загружаем...
+    </div>
+    <div class="lb-card" id="lb-list" style="display:none"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbzTnHTqtR_06nFiPliv42vkd8jDs8D0KF2uFpq1pt918TrExjOyS27LzFMepHgZSiEPNw/exec';
+
+let tg = window.Telegram?.WebApp;
+let userId, userName;
+let matches = [];
+let userPredictions = {}; // match_id → {prediction, is_x2, points}
+let x2UsedThisWeek = false;
+let userTotalScore = 0;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor('#0a0e1a');
+    tg.setBackgroundColor('#0a0e1a');
+    const u = tg.initDataUnsafe?.user;
+    if (u) {
+      userId = u.id.toString();
+      userName = u.first_name + (u.last_name ? ' ' + u.last_name : '');
+    }
+  }
+
+  // Fallback для теста вне Telegram
+  if (!userId) {
+    userId = 'test_' + Math.floor(Math.random() * 9000 + 1000);
+    userName = null;
+  }
+
+  await checkRegistration();
+});
+
+async function checkRegistration() {
+  const saved = localStorage.getItem('wc2026_user_' + userId);
+  if (saved) {
+    const data = JSON.parse(saved);
+    userName = data.name;
+    showApp();
+  } else if (userName) {
+    // Автоматически регистрируем Telegram-пользователей
+    await doRegister(userName);
+    showApp();
+  } else {
+    document.getElementById('register-screen').style.display = 'flex';
+  }
+}
+
+async function registerUser() {
+  const input = document.getElementById('name-input');
+  const name = input.value.trim();
+  if (!name) { showToast('Введи имя!', 'error'); return; }
+  await doRegister(name);
+  document.getElementById('register-screen').style.display = 'none';
+  showApp();
+}
+
+async function doRegister(name) {
+  userName = name;
+  localStorage.setItem('wc2026_user_' + userId, JSON.stringify({ name }));
+  await apiCall({ action: 'registerUser', user_id: userId, name });
+}
+
+function showApp() {
+  document.getElementById('user-name-badge').textContent = userName;
+  document.getElementById('main-app').style.display = 'block';
+  loadAll();
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function apiCall(params) {
+  const url = new URL(API_URL);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  try {
+    const res = await fetch(url.toString());
+    return await res.json();
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+// ── LOAD ALL ──────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const [matchesData, predsData, lbData] = await Promise.all([
+    apiCall({ action: 'getMatches' }),
+    apiCall({ action: 'getUserPredictions', user_id: userId }),
+    apiCall({ action: 'getLeaderboard' })
+  ]);
+
+  matches = matchesData.matches || [];
+
+  // Map predictions
+  userPredictions = {};
+  (predsData.predictions || []).forEach(p => {
+    userPredictions[p.match_id] = p;
+  });
+
+  // Check x2 this week
+  checkX2ThisWeek();
+
+  // Render
+  renderMatches();
+  renderLeaderboard(lbData.leaderboard || []);
+  updateUserScore(lbData.leaderboard || []);
+}
+
+function checkX2ThisWeek() {
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+
+  x2UsedThisWeek = false;
+  matches.forEach(m => {
+    const deadline = new Date(m.deadline);
+    if (deadline >= weekStart) {
+      const pred = userPredictions[m.id];
+      if (pred && pred.is_x2) x2UsedThisWeek = true;
+    }
+  });
+}
+
+function updateUserScore(lb) {
+  const me = lb.find(r => r.user_id === userId);
+  userTotalScore = me ? me.points : 0;
+  document.getElementById('user-score-badge').textContent = userTotalScore + ' pts';
+}
+
+// ── MATCHES ───────────────────────────────────────────────────────────────────
+function renderMatches() {
+  const loader = document.getElementById('matches-loader');
+  const list = document.getElementById('matches-list');
+  loader.style.display = 'none';
+
+  if (!matches.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📅</div><div class="empty-text">Матчи ещё не добавлены</div></div>';
+    return;
+  }
+
+  list.innerHTML = matches.map(m => renderMatchCard(m)).join('');
+}
+
+function renderMatchCard(m) {
+  const now = new Date();
+  const deadline = new Date(m.deadline);
+  const isLocked = now > deadline;
+  const hasResult = !!m.result;
+  const pred = userPredictions[m.id];
+  const hasPred = !!pred;
+
+  // Deadline display
+  let deadlineText = '';
+  let deadlineClass = '';
+  const diffMs = deadline - now;
+  const diffH = diffMs / 3600000;
+  if (isLocked) {
+    deadlineText = '🔒 Закрыт';
+    deadlineClass = 'locked';
+  } else if (diffH < 3) {
+    deadlineText = '⏳ ' + Math.ceil(diffMs / 60000) + ' мин';
+    deadlineClass = 'soon';
+  } else if (diffH < 24) {
+    deadlineText = '⏰ ' + Math.floor(diffH) + ' ч';
+    deadlineClass = 'soon';
+  } else {
+    deadlineText = '📅 ' + deadline.toLocaleDateString('ru', { day: 'numeric', month: 'short' });
+  }
+
+  // x2 available for this match
+  const thisPredIsX2 = pred?.is_x2;
+  const canX2 = !isLocked && (!x2UsedThisWeek || thisPredIsX2);
+
+  let teamsHtml = '';
+  if (m.type === 'match') {
+    teamsHtml = `
+      <div class="teams-row">
+        <div class="team-name">${m.team1}</div>
+        <div class="vs-badge">VS</div>
+        <div class="team-name">${m.team2}</div>
+      </div>`;
+  } else {
+    teamsHtml = `<div class="special-title">🌟 ${m.title}</div>`;
+  }
+
+  const resultHtml = hasResult
+    ? `<div class="result-badge">✅ Результат: <strong>${m.result}</strong></div>` : '';
+
+  // Points display
+  let pointsHtml = '';
+  if (hasPred && hasResult && pred.points !== '') {
+    const pts = Number(pred.points);
+    const cls = pts > 0 ? 'pos' : pts < 0 ? 'neg' : '';
+    const sign = pts > 0 ? '+' : '';
+    pointsHtml = `<div class="points-chip">
+      <div class="pred-preview">
+        Твой прогноз: <span class="val">${pred.prediction}</span>
+        ${pred.is_x2 ? '<span class="x2-tag">x2</span>' : ''}
+      </div>
+      <div>
+        <div class="pts-value ${cls}">${sign}${pts} pts</div>
+      </div>
+    </div>`;
+  } else if (hasPred && !hasResult) {
+    pointsHtml = `<div class="points-chip">
+      <div class="pred-preview">
+        Твой прогноз: <span class="val">${pred.prediction}</span>
+        ${pred.is_x2 ? '<span class="x2-tag">x2</span>' : ''}
+      </div>
+      <div class="pts-value" style="color:var(--muted)">ждём</div>
+    </div>`;
+  }
+
+  const placeholder = m.type === 'match' ? 'напр. 2:1' : 'твой ответ';
+
+  const formHtml = !isLocked ? `
+    <div class="pred-form">
+      <input class="pred-input" id="inp-${m.id}"
+        type="text"
+        placeholder="${placeholder}"
+        value="${pred?.prediction || ''}"
+        ${isLocked ? 'disabled' : ''}>
+      <button class="x2-btn ${thisPredIsX2 ? 'active' : ''}"
+        id="x2-${m.id}"
+        onclick="toggleX2('${m.id}')"
+        ${!canX2 && !thisPredIsX2 ? 'disabled' : ''}
+        title="${x2UsedThisWeek && !thisPredIsX2 ? 'x2 уже использован в этом туре' : 'Ставка x2'}">
+        ⚡x2
+      </button>
+      <button class="save-btn" onclick="savePrediction('${m.id}')">✓</button>
+    </div>` : '';
+
+  return `
+    <div class="match-card ${hasPred ? 'has-prediction' : ''} ${isLocked ? 'locked' : ''}" id="card-${m.id}">
+      <div class="match-header">
+        <div class="match-type">${m.type === 'match' ? '⚽ Матч' : '🌟 Событие'}</div>
+        <div class="match-deadline ${deadlineClass}">${deadlineText}</div>
+      </div>
+      ${teamsHtml}
+      ${resultHtml}
+      ${pointsHtml}
+      ${formHtml}
+    </div>`;
+}
+
+// ── X2 TOGGLE ─────────────────────────────────────────────────────────────────
+function toggleX2(matchId) {
+  const btn = document.getElementById('x2-' + matchId);
+  const isActive = btn.classList.contains('active');
+  btn.classList.toggle('active', !isActive);
+
+  // Update global x2 state visually
+  if (!isActive) {
+    // Just activated — disable all other x2 buttons in this week
+    matches.forEach(m => {
+      if (m.id !== matchId) {
+        const other = document.getElementById('x2-' + m.id);
+        if (other && !other.classList.contains('active')) {
+          other.disabled = true;
+        }
+      }
+    });
+  } else {
+    // Deactivated — re-enable all
+    matches.forEach(m => {
+      const other = document.getElementById('x2-' + m.id);
+      if (other) other.disabled = false;
+    });
+  }
+}
+
+// ── SAVE PREDICTION ───────────────────────────────────────────────────────────
+async function savePrediction(matchId) {
+  const input = document.getElementById('inp-' + matchId);
+  const x2btn = document.getElementById('x2-' + matchId);
+  const prediction = input.value.trim();
+
+  if (!prediction) { showToast('Введи прогноз!', 'error'); return; }
+
+  const isX2 = x2btn.classList.contains('active');
+  const btn = document.querySelector(`#card-${matchId} .save-btn`);
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  const res = await apiCall({
+    action: 'savePrediction',
+    user_id: userId,
+    match_id: matchId,
+    prediction,
+    is_x2: isX2.toString()
+  });
+
+  btn.textContent = '✓';
+  btn.disabled = false;
+
+  if (res.error) {
+    showToast(res.error, 'error');
+  } else {
+    showToast(isX2 ? '⚡ Прогноз x2 сохранён!' : '✅ Прогноз сохранён!', 'success');
+    userPredictions[matchId] = { prediction, is_x2: isX2, points: '' };
+    if (isX2) x2UsedThisWeek = true;
+    // Refresh card
+    const card = document.getElementById('card-' + matchId);
+    const match = matches.find(m => m.id === matchId);
+    if (match) card.outerHTML = renderMatchCard(match);
+  }
+}
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+async function loadLeaderboard() {
+  document.getElementById('lb-loader').style.display = 'block';
+  document.getElementById('lb-list').style.display = 'none';
+  const data = await apiCall({ action: 'getLeaderboard' });
+  renderLeaderboard(data.leaderboard || []);
+  updateUserScore(data.leaderboard || []);
+}
+
+function renderLeaderboard(lb) {
+  document.getElementById('lb-loader').style.display = 'none';
+  const list = document.getElementById('lb-list');
+
+  if (!lb.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">🏆</div><div class="empty-text">Пока никто не сделал прогнозов</div></div>';
+    list.style.display = 'block';
+    return;
+  }
+
+  const ranks = ['gold', 'silver', 'bronze'];
+  const medals = ['🥇', '🥈', '🥉'];
+
+  list.innerHTML = lb.map((p, i) => {
+    const isMe = p.user_id === userId;
+    const rankClass = i < 3 ? ranks[i] : '';
+    const rankLabel = i < 3 ? medals[i] : (i + 1);
+    const initials = p.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    const pts = Math.round(p.points * 10) / 10;
+    const sign = pts > 0 ? '+' : '';
+
+    return `
+      <div class="lb-row ${isMe ? 'me' : ''}">
+        <div class="lb-rank ${rankClass}">${rankLabel}</div>
+        <div class="lb-avatar">${initials}</div>
+        <div class="lb-name">${p.name}${isMe ? ' 👈' : ''}</div>
+        <div>
+          <div class="lb-pts">${sign}${pts}</div>
+          <div class="lb-pts-label">очков</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.style.display = 'block';
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'leaderboard') loadLeaderboard();
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  setTimeout(() => t.classList.add('show'), 10);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
