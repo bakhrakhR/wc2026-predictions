@@ -7,141 +7,172 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;900&display=swap');
-
-:root {
-  --bg:#0a0e1a; --card:#111827; --card2:#1a2235; --border:#1e2d45;
-  --accent:#e8c14a; --accent2:#f97316; --green:#22c55e; --red:#ef4444;
-  --blue:#3b82f6; --text:#f0f4ff; --muted:#6b7a99; --radius:16px;
-}
+:root{--bg:#0a0e1a;--card:#111827;--card2:#1a2235;--border:#1e2d45;--accent:#e8c14a;--accent2:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;--text:#f0f4ff;--muted:#6b7a99;--r:16px;}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Nunito',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
 
-.header{background:linear-gradient(135deg,#0d1b2e,#1a2f4e);padding:16px 16px 12px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border);}
-.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.logo{font-family:'Bebas Neue',Arial,sans-serif;font-size:24px;letter-spacing:2px;color:var(--accent);}
+.header{background:linear-gradient(135deg,#0d1b2e,#1a2f4e);padding:14px 14px 10px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border);}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.logo{font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;letter-spacing:2px;color:var(--accent);}
 .logo span{color:var(--text);}
-.user-badge{background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.user-badge{background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:5px;}
 .user-badge .score{color:var(--accent);}
 
-.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
+.tabs{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;}
 .tabs::-webkit-scrollbar{display:none;}
-.tab{flex-shrink:0;padding:8px 12px;background:var(--card);border:1.5px solid var(--border);border-radius:10px;font-family:'Nunito',Arial,sans-serif;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.2s;}
+.tab{flex-shrink:0;padding:7px 10px;background:var(--card);border:1.5px solid var(--border);border-radius:9px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.2s;position:relative;}
 .tab.active{background:var(--accent);border-color:var(--accent);color:#0a0e1a;}
-.tab.admin-tab{border-color:#7c3aed44;color:#a855f7;}
-.tab.admin-tab.active{background:#7c3aed;border-color:#7c3aed;color:white;}
+.tab.admin-tab{border-color:#7c3aed44;color:var(--purple);}
+.tab.admin-tab.active{background:var(--purple);border-color:var(--purple);color:white;}
+.badge{position:absolute;top:-5px;right:-5px;background:var(--red);color:white;font-size:9px;font-weight:900;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;}
 
-.page{display:none;padding:14px;padding-bottom:50px;}
+.page{display:none;padding:12px;padding-bottom:50px;}
 .page.active{display:block;}
 
-.match-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
+/* FILTERS */
+.filters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:12px;padding-bottom:2px;}
+.filters::-webkit-scrollbar{display:none;}
+.filter-btn{flex-shrink:0;padding:5px 10px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#0a0e1a;}
+
+/* MATCH CARD */
+.match-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden;}
 .match-card.has-pred{border-color:#2a3d5e;}
-.match-card.locked{opacity:0.75;}
-.match-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 4px;}
-.match-type{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
-.match-dl{font-size:11px;color:var(--muted);}
+.match-card.locked{opacity:0.8;}
+.match-card.special-card{border-color:#4c1d9544;}
+.match-header{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 4px;}
+.match-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+.match-dl{font-size:10px;color:var(--muted);}
 .match-dl.soon{color:var(--accent2);}
 .match-dl.past{color:var(--red);}
 
-.score-row{display:flex;align-items:flex-end;justify-content:center;padding:8px 14px 12px;gap:10px;}
-.team-block{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;max-width:110px;}
-.team-flag{font-size:30px;line-height:1;}
-.team-name{font-family:'Bebas Neue',Arial,sans-serif;font-size:14px;color:var(--text);text-align:center;line-height:1.2;}
-.score-box{width:54px;height:54px;background:var(--card2);border:2px solid var(--border);border-radius:12px;font-family:'Bebas Neue',Arial,sans-serif;font-size:28px;color:var(--text);text-align:center;outline:none;transition:border-color 0.2s;-moz-appearance:textfield;}
+.score-row{display:flex;align-items:flex-end;justify-content:center;padding:6px 12px 10px;gap:8px;}
+.team-block{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;max-width:110px;}
+.team-flag{font-size:28px;line-height:1;}
+.team-name{font-family:'Bebas Neue',Arial,sans-serif;font-size:13px;color:var(--text);text-align:center;line-height:1.2;}
+.score-box{width:50px;height:50px;background:var(--card2);border:2px solid var(--border);border-radius:10px;font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:var(--text);text-align:center;outline:none;transition:border-color 0.2s;-moz-appearance:textfield;}
 .score-box::-webkit-outer-spin-button,.score-box::-webkit-inner-spin-button{-webkit-appearance:none;}
 .score-box:focus{border-color:var(--accent);}
 .score-box:disabled{opacity:0.5;}
-.score-sep{font-family:'Bebas Neue',Arial,sans-serif;font-size:30px;color:var(--muted);flex-shrink:0;padding-bottom:2px;}
+.score-sep{font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:var(--muted);flex-shrink:0;padding-bottom:2px;}
 
-.special-title{font-size:14px;font-weight:700;padding:4px 14px 8px;color:var(--text);}
-.special-input{width:calc(100% - 28px);margin:0 14px 12px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-family:'Nunito',Arial,sans-serif;font-size:14px;font-weight:700;color:var(--text);outline:none;}
+.special-title{font-size:13px;font-weight:700;padding:4px 12px 8px;color:var(--text);}
+.special-input{width:calc(100% - 24px);margin:0 12px 10px;background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 11px;font-family:'Nunito',Arial,sans-serif;font-size:13px;font-weight:700;color:var(--text);outline:none;}
 .special-input:focus{border-color:var(--accent);}
 .special-input:disabled{opacity:0.5;}
 
-.result-badge{display:flex;align-items:center;gap:6px;margin:0 14px 8px;padding:6px 12px;background:#1a2a1a;border:1px solid #2d4a2d;border-radius:8px;font-size:13px;font-weight:700;color:var(--green);}
+.result-badge{display:flex;align-items:center;gap:5px;margin:0 12px 8px;padding:5px 10px;background:#1a2a1a;border:1px solid #2d4a2d;border-radius:7px;font-size:12px;font-weight:700;color:var(--green);}
 
-.card-bottom{border-top:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:8px;}
-.x2-btn{background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 11px;font-size:12px;font-weight:900;color:var(--muted);cursor:pointer;transition:all 0.2s;white-space:nowrap;flex-shrink:0;}
+.card-bottom{border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:7px;}
+.x2-btn{background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:7px 9px;font-size:11px;font-weight:900;color:var(--muted);cursor:pointer;transition:all 0.2s;white-space:nowrap;flex-shrink:0;}
 .x2-btn.active{background:linear-gradient(135deg,#f97316,#dc2626);border-color:#f97316;color:white;}
 .x2-btn:disabled{opacity:0.4;cursor:not-allowed;}
-.save-btn{background:var(--accent);border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:900;color:#0a0e1a;cursor:pointer;flex-shrink:0;margin-left:auto;}
+.save-btn{background:var(--accent);border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:900;color:#0a0e1a;cursor:pointer;flex-shrink:0;margin-left:auto;}
 .save-btn:active{transform:scale(0.95);}
 
-.pred-info{border-top:1px solid var(--border);padding:9px 14px;display:flex;align-items:center;justify-content:space-between;font-size:13px;}
+.pred-info{border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;}
 .pred-val{color:var(--muted);font-weight:600;}
 .pred-val span{color:var(--text);font-weight:700;}
-.x2-tag{background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-size:10px;font-weight:900;padding:2px 6px;border-radius:4px;margin-left:4px;}
-.pts{font-weight:900;font-size:14px;}
+.x2-tag{background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-size:9px;font-weight:900;padding:1px 5px;border-radius:3px;margin-left:3px;}
+.pts{font-weight:900;font-size:13px;}
 .pts.pos{color:var(--green);}.pts.neg{color:var(--red);}.pts.wait{color:var(--muted);}
 
-.section-title{font-family:'Bebas Neue',Arial,sans-serif;font-size:18px;letter-spacing:2px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+/* OTHERS PREDICTIONS */
+.others-preds{border-top:1px solid var(--border);padding:8px 12px;}
+.others-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.others-list{display:flex;flex-wrap:wrap;gap:5px;}
+.other-chip{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;}
+.other-chip .oname{color:var(--muted);}
+.other-chip .oval{color:var(--text);}
+.other-chip.ox2{border-color:#f9731644;}
+.other-chip .opts.pos{color:var(--green);font-size:10px;}
+.other-chip .opts.neg{color:var(--red);font-size:10px;}
+
+/* SECTION */
+.section-title{font-family:'Bebas Neue',Arial,sans-serif;font-size:17px;letter-spacing:2px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
 
-.lb-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.lb-row{display:flex;align-items:center;padding:12px 16px;gap:12px;border-bottom:1px solid var(--border);}
+/* LEADERBOARD */
+.lb-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.lb-row{display:flex;align-items:center;padding:11px 14px;gap:11px;border-bottom:1px solid var(--border);}
 .lb-row:last-child{border-bottom:none;}
 .lb-row.me{background:#0f1e35;}
-.lb-rank{font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;width:26px;text-align:center;color:var(--muted);flex-shrink:0;}
+.lb-rank{font-family:'Bebas Neue',Arial,sans-serif;font-size:19px;width:24px;text-align:center;color:var(--muted);flex-shrink:0;}
 .lb-rank.gold{color:#fbbf24;}.lb-rank.silver{color:#94a3b8;}.lb-rank.bronze{color:#cd7c3a;}
-.lb-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0;}
-.lb-name{flex:1;font-weight:700;font-size:14px;}
-.lb-pts{font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:var(--accent);}
-.lb-pts-lbl{font-size:10px;color:var(--muted);font-weight:700;text-align:right;}
+.lb-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;}
+.lb-name{flex:1;font-weight:700;font-size:13px;}
+.lb-pts{font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:var(--accent);}
+.lb-pts-lbl{font-size:9px;color:var(--muted);font-weight:700;text-align:right;}
 
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
-.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+/* HISTORY */
+.hist-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;overflow:hidden;}
+.hist-header{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;}
+.hist-title{font-size:13px;font-weight:700;}
+.hist-result{font-size:12px;font-weight:700;color:var(--green);}
+.hist-pred{padding:0 12px 9px;display:flex;align-items:center;justify-content:space-between;font-size:12px;}
+.hist-pred-val{color:var(--muted);}
+.hist-pred-val span{color:var(--text);font-weight:700;}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;}
 .stat-card.wide{grid-column:1/-1;}
-.stat-val{font-family:'Bebas Neue',Arial,sans-serif;font-size:30px;color:var(--accent);}
-.stat-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
-.prog{height:6px;background:var(--border);border-radius:3px;margin-top:8px;overflow:hidden;}
+.stat-val{font-family:'Bebas Neue',Arial,sans-serif;font-size:28px;color:var(--accent);}
+.stat-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+.prog{height:5px;background:var(--border);border-radius:3px;margin-top:7px;overflow:hidden;}
 .prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;}
-.ps-row{display:flex;align-items:center;padding:10px 14px;gap:10px;border-bottom:1px solid var(--border);}
+.ps-row{display:flex;align-items:center;padding:9px 12px;gap:9px;border-bottom:1px solid var(--border);}
 .ps-row:last-child{border-bottom:none;}
-.ps-name{flex:1;font-weight:700;font-size:13px;}
+.ps-name{flex:1;font-weight:700;font-size:12px;}
 .ps-bar{flex:2;}
-.ps-pts{font-weight:900;font-size:13px;color:var(--accent);min-width:32px;text-align:right;}
+.ps-pts{font-weight:900;font-size:12px;color:var(--accent);min-width:30px;text-align:right;}
 
-.admin-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;}
-.admin-title{font-weight:700;font-size:14px;margin-bottom:10px;}
-.admin-row{display:flex;gap:8px;align-items:center;}
-.admin-input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 12px;font-family:'Nunito',Arial,sans-serif;font-size:13px;font-weight:700;color:var(--text);outline:none;}
-.admin-input:focus{border-color:#a855f7;}
-.admin-btn{background:#7c3aed;border:none;border-radius:9px;padding:10px 14px;font-size:13px;font-weight:900;color:white;cursor:pointer;flex-shrink:0;}
-.res-set{color:var(--green);font-size:12px;font-weight:700;margin-top:6px;}
+/* ADMIN */
+.admin-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:8px;}
+.admin-title{font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.del-btn{background:transparent;border:none;font-size:16px;cursor:pointer;opacity:0.6;padding:2px;}
+.del-btn:hover{opacity:1;}
+.admin-row{display:flex;gap:7px;align-items:center;}
+.admin-input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'Nunito',Arial,sans-serif;font-size:12px;font-weight:700;color:var(--text);outline:none;}
+.admin-input:focus{border-color:var(--purple);}
+.admin-btn{background:var(--purple);border:none;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:900;color:white;cursor:pointer;flex-shrink:0;}
+.res-set{color:var(--green);font-size:11px;font-weight:700;margin-top:5px;}
 
-.import-box{background:linear-gradient(135deg,#1a1040,#0f1e35);border:1px solid #4c1d95;border-radius:var(--radius);padding:14px;margin-bottom:14px;}
-.import-title{font-family:'Bebas Neue',Arial,sans-serif;font-size:17px;letter-spacing:1px;color:#a855f7;margin-bottom:6px;}
-.import-sub{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5;}
-.api-input{width:100%;background:var(--card2);border:1.5px solid #4c1d95;border-radius:9px;padding:9px 12px;font-size:13px;color:var(--text);outline:none;margin-bottom:8px;font-family:'Nunito',Arial,sans-serif;}
-.import-btn{width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;border-radius:9px;padding:11px;font-size:14px;font-weight:900;color:white;cursor:pointer;}
+.import-box{background:linear-gradient(135deg,#1a1040,#0f1e35);border:1px solid #4c1d95;border-radius:var(--r);padding:12px;margin-bottom:12px;}
+.import-title{font-family:'Bebas Neue',Arial,sans-serif;font-size:16px;letter-spacing:1px;color:var(--purple);margin-bottom:5px;}
+.import-sub{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4;}
+.api-input{width:100%;background:var(--card2);border:1.5px solid #4c1d95;border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);outline:none;margin-bottom:7px;font-family:'Nunito',Arial,sans-serif;}
+.import-btn{width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:900;color:white;cursor:pointer;}
 
-.add-box{background:var(--card);border:1px dashed var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;}
-.add-title{font-weight:700;font-size:13px;color:var(--muted);margin-bottom:10px;}
-.add-row{display:flex;gap:8px;margin-bottom:8px;}
-.add-input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;font-family:'Nunito',Arial,sans-serif;}
+.add-box{background:var(--card);border:1px dashed var(--border);border-radius:var(--r);padding:12px;margin-bottom:12px;}
+.add-title{font-weight:700;font-size:12px;color:var(--muted);margin-bottom:8px;}
+.add-row{display:flex;gap:6px;margin-bottom:6px;}
+.add-input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);outline:none;font-family:'Nunito',Arial,sans-serif;}
+.add-input:focus{border-color:var(--accent);}
 select.add-input{cursor:pointer;}
 
-.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e2d45;border:1px solid var(--border);border-radius:12px;padding:11px 18px;font-size:13px;font-weight:700;z-index:999;transition:transform 0.3s;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+.toast{position:fixed;bottom:14px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e2d45;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;z-index:999;transition:transform 0.3s;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
 .toast.show{transform:translateX(-50%) translateY(0);}
 .toast.ok{border-color:var(--green);color:var(--green);}
 .toast.err{border-color:var(--red);color:var(--red);}
 .toast.info{border-color:var(--accent);color:var(--accent);}
 
-.loader{text-align:center;padding:36px 20px;color:var(--muted);font-weight:600;}
-.spin{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;}
+.loader{text-align:center;padding:32px 20px;color:var(--muted);font-weight:600;font-size:13px;}
+.spin{width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 8px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.empty{text-align:center;padding:36px 20px;color:var(--muted);}
-.empty-ic{font-size:36px;margin-bottom:10px;}
+.empty{text-align:center;padding:32px 20px;color:var(--muted);font-size:13px;}
+.empty-ic{font-size:32px;margin-bottom:8px;}
 
-.reg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85vh;padding:24px;text-align:center;gap:14px;}
-.reg-ic{font-size:56px;}
-.reg-title{font-family:'Bebas Neue',Arial,sans-serif;font-size:30px;letter-spacing:2px;color:var(--accent);}
-.reg-sub{color:var(--muted);font-size:14px;line-height:1.5;}
-.reg-input{width:100%;background:var(--card);border:2px solid var(--border);border-radius:12px;padding:13px 16px;font-size:15px;font-weight:700;color:var(--text);outline:none;text-align:center;font-family:'Nunito',Arial,sans-serif;}
+.reg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85vh;padding:22px;text-align:center;gap:12px;}
+.reg-ic{font-size:52px;}
+.reg-title{font-family:'Bebas Neue',Arial,sans-serif;font-size:28px;letter-spacing:2px;color:var(--accent);}
+.reg-sub{color:var(--muted);font-size:13px;line-height:1.5;}
+.reg-input{width:100%;background:var(--card);border:2px solid var(--border);border-radius:11px;padding:12px 14px;font-size:14px;font-weight:700;color:var(--text);outline:none;text-align:center;font-family:'Nunito',Arial,sans-serif;}
 .reg-input:focus{border-color:var(--accent);}
-.reg-btn{width:100%;background:var(--accent);border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:900;color:#0a0e1a;cursor:pointer;}
+.reg-btn{width:100%;background:var(--accent);border:none;border-radius:11px;padding:13px;font-size:14px;font-weight:900;color:#0a0e1a;cursor:pointer;}
 
-.refresh-row{display:flex;justify-content:flex-end;margin-bottom:10px;}
-.refresh-btn{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 11px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;}
+.refresh-row{display:flex;justify-content:flex-end;margin-bottom:8px;}
+.refresh-btn{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;}
 </style>
 </head>
 <body>
@@ -161,7 +192,8 @@ select.add-input{cursor:pointer;}
       <div class="user-badge"><span id="uname">—</span><span class="score" id="uscore">0 pts</span></div>
     </div>
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('pred',this)">⚽ Прогнозы</button>
+      <button class="tab active" id="tab-pred" onclick="switchTab('pred',this)">⚽ Прогнозы<span class="badge" id="badge-pred" style="display:none">0</span></button>
+      <button class="tab" onclick="switchTab('hist',this)">📋 История</button>
       <button class="tab" onclick="switchTab('lb',this)">🏆 Лидерборд</button>
       <button class="tab" onclick="switchTab('stats',this)">📊 Статистика</button>
       <button class="tab admin-tab" id="admin-tab" style="display:none" onclick="switchTab('admin',this)">⚙️ Админ</button>
@@ -169,8 +201,16 @@ select.add-input{cursor:pointer;}
   </div>
 
   <div class="page active" id="page-pred">
+    <!-- Filters -->
+    <div class="filters" id="group-filters"></div>
     <div class="loader" id="pred-loader"><div class="spin"></div>Загружаем матчи...</div>
     <div id="matches"></div>
+  </div>
+
+  <div class="page" id="page-hist">
+    <div class="section-title">Сыгранные матчи</div>
+    <div class="loader" id="hist-loader"><div class="spin"></div></div>
+    <div id="hist-list"></div>
   </div>
 
   <div class="page" id="page-lb">
@@ -188,16 +228,15 @@ select.add-input{cursor:pointer;}
   <div class="page" id="page-admin">
     <div class="import-box">
       <div class="import-title">🌐 Импорт матчей ЧМ 2026</div>
-      <div class="import-sub">API-ключ с football-data.org — запрос идёт через Google Apps Script</div>
+      <div class="import-sub">API-ключ с football-data.org — запрос идёт через Apps Script</div>
       <input class="api-input" id="api-key" type="text" placeholder="Вставь API-ключ...">
       <button class="import-btn" onclick="importMatches()">⚡ Импортировать матчи</button>
     </div>
-
     <div class="add-box">
       <div class="add-title">➕ Добавить своё событие</div>
       <div class="add-row">
         <input class="add-input" id="ev-title" type="text" placeholder="Название">
-        <select class="add-input" id="ev-type" style="max-width:110px" onchange="toggleTeams()">
+        <select class="add-input" id="ev-type" style="max-width:105px" onchange="toggleTeams()">
           <option value="special">🌟 Событие</option>
           <option value="match">⚽ Матч</option>
         </select>
@@ -211,7 +250,6 @@ select.add-input{cursor:pointer;}
         <button class="admin-btn" onclick="addEvent()">Добавить</button>
       </div>
     </div>
-
     <div class="section-title">Результаты</div>
     <div id="admin-list"><div class="loader"><div class="spin"></div></div></div>
   </div>
@@ -224,36 +262,93 @@ const API = 'https://script.google.com/macros/s/AKfycbyLJ-efaVw_W-MgDVJJgaPhPqnx
 const ADMIN_KEY = 'WC2026ADMIN';
 const ADMIN_IDS = ['349513510'];
 
+// Полный словарь флагов ЧМ 2026
 const FLAGS = {
-  'Аргентина':'🇦🇷','Argentina':'🇦🇷','Франция':'🇫🇷','France':'🇫🇷',
-  'Бразилия':'🇧🇷','Brazil':'🇧🇷','Германия':'🇩🇪','Germany':'🇩🇪',
-  'Испания':'🇪🇸','Spain':'🇪🇸','Португалия':'🇵🇹','Portugal':'🇵🇹',
-  'Англия':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Нидерланды':'🇳🇱','Netherlands':'🇳🇱',
-  'Бельгия':'🇧🇪','Belgium':'🇧🇪','Хорватия':'🇭🇷','Croatia':'🇭🇷',
-  'Марокко':'🇲🇦','Morocco':'🇲🇦','Япония':'🇯🇵','Japan':'🇯🇵',
-  'Мексика':'🇲🇽','Mexico':'🇲🇽','США':'🇺🇸','United States':'🇺🇸',
-  'Канада':'🇨🇦','Canada':'🇨🇦','Австралия':'🇦🇺','Australia':'🇦🇺',
-  'Сенегал':'🇸🇳','Senegal':'🇸🇳','Уругвай':'🇺🇾','Uruguay':'🇺🇾',
-  'Колумбия':'🇨🇴','Colombia':'🇨🇴','Швейцария':'🇨🇭','Switzerland':'🇨🇭',
-  'Турция':'🇹🇷','Turkey':'🇹🇷','Италия':'🇮🇹','Italy':'🇮🇹',
-  'Сербия':'🇷🇸','Serbia':'🇷🇸','Польша':'🇵🇱','Poland':'🇵🇱',
-  'Южная Корея':'🇰🇷','South Korea':'🇰🇷','Иран':'🇮🇷','Iran':'🇮🇷',
-  'Марокко':'🇲🇦','Morocco':'🇲🇦','Тунис':'🇹🇳','Tunisia':'🇹🇳',
-  'Эквадор':'🇪🇨','Ecuador':'🇪🇨','Венесуэла':'🇻🇪','Venezuela':'🇻🇪',
-  'Перу':'🇵🇪','Peru':'🇵🇪','Чили':'🇨🇱','Chile':'🇨🇱',
-  'Парагвай':'🇵🇾','Paraguay':'🇵🇾','Боливия':'🇧🇴','Bolivia':'🇧🇴',
+  // Группа A
+  'Ecuador':'🇪🇨','Эквадор':'🇪🇨',
+  'Panama':'🇵🇦','Панама':'🇵🇦',
+  'Peru':'🇵🇪','Перу':'🇵🇪',
+  'Bolivia':'🇧🇴','Боливия':'🇧🇴',
+  // Группа B
+  'Argentina':'🇦🇷','Аргентина':'🇦🇷',
+  'Chile':'🇨🇱','Чили':'🇨🇱',
+  'Nepal':'🇳🇵',
+  // Группа C
+  'Mexico':'🇲🇽','Мексика':'🇲🇽',
+  'Jamaica':'🇯🇲','Ямайка':'🇯🇲',
+  'Venezuela':'🇻🇪','Венесуэла':'🇻🇪',
+  'Martinique':'🇲🇶',
+  // Группа D
+  'United States':'🇺🇸','США':'🇺🇸',
+  'Canada':'🇨🇦','Канада':'🇨🇦',
+  'Uruguay':'🇺🇾','Уругвай':'🇺🇾',
+  'Colombia':'🇨🇴','Колумбия':'🇨🇴',
+  // Группа E
+  'Brazil':'🇧🇷','Бразилия':'🇧🇷',
+  'Paraguay':'🇵🇾','Парагвай':'🇵🇾',
+  'Costa Rica':'🇨🇷','Коста-Рика':'🇨🇷',
+  'Honduras':'🇭🇳','Гондурас':'🇭🇳',
+  // Группа F
+  'Germany':'🇩🇪','Германия':'🇩🇪',
+  'Portugal':'🇵🇹','Португалия':'🇵🇹',
+  'Hungary':'🇭🇺','Венгрия':'🇭🇺',
+  'Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','Шотландия':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  // Группа G
+  'France':'🇫🇷','Франция':'🇫🇷',
+  'Spain':'🇪🇸','Испания':'🇪🇸',
+  'Belgium':'🇧🇪','Бельгия':'🇧🇪',
+  'Italy':'🇮🇹','Италия':'🇮🇹',
+  // Группа H
+  'England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Англия':'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'Netherlands':'🇳🇱','Нидерланды':'🇳🇱',
+  'Denmark':'🇩🇰','Дания':'🇩🇰',
+  'Croatia':'🇭🇷','Хорватия':'🇭🇷',
+  // Группа I
+  'Morocco':'🇲🇦','Марокко':'🇲🇦',
+  'Senegal':'🇸🇳','Сенегал':'🇸🇳',
+  'South Africa':'🇿🇦','ЮАР':'🇿🇦',
+  'Tunisia':'🇹🇳','Тунис':'🇹🇳',
+  // Группа J
+  'Japan':'🇯🇵','Япония':'🇯🇵',
+  'South Korea':'🇰🇷','Южная Корея':'🇰🇷',
+  'Australia':'🇦🇺','Австралия':'🇦🇺',
+  'Indonesia':'🇮🇩','Индонезия':'🇮🇩',
+  // Группа K
+  'Iran':'🇮🇷','Иран':'🇮🇷',
+  'Saudi Arabia':'🇸🇦','Саудовская Аравия':'🇸🇦',
+  'Uzbekistan':'🇺🇿','Узбекистан':'🇺🇿',
+  'New Zealand':'🇳🇿','Новая Зеландия':'🇳🇿',
+  // Группа L
+  'Nigeria':'🇳🇬','Нигерия':'🇳🇬',
+  'Egypt':'🇪🇬','Египет':'🇪🇬',
+  'Cameroon':'🇨🇲','Камерун':'🇨🇲',
+  'Tanzania':'🇹🇿','Танзания':'🇹🇿',
+  // Другие
+  'Switzerland':'🇨🇭','Швейцария':'🇨🇭',
+  'Serbia':'🇷🇸','Сербия':'🇷🇸',
+  'Poland':'🇵🇱','Польша':'🇵🇱',
+  'Turkey':'🇹🇷','Турция':'🇹🇷',
+  'Ghana':'🇬🇭','Гана':'🇬🇭',
+  'Wales':'🏴󠁧󠁢󠁷󠁬󠁳󠁿','Уэльс':'🏴󠁧󠁢󠁷󠁬󠁳󠁿',
+  'Czech Republic':'🇨🇿','Чехия':'🇨🇿',
+  'Austria':'🇦🇹','Австрия':'🇦🇹',
+  'Romania':'🇷🇴','Румыния':'🇷🇴',
+  'Ukraine':'🇺🇦','Украина':'🇺🇦',
+  'Greece':'🇬🇷','Греция':'🇬🇷',
+  'Albania':'🇦🇱','Албания':'🇦🇱',
+  'Slovakia':'🇸🇰','Словакия':'🇸🇰',
+  'Slovenia':'🇸🇮','Словения':'🇸🇮',
 };
 const F = n => FLAGS[n] || '🏳️';
 
 let tg = window.Telegram?.WebApp;
 let uid, uname, matches = [], preds = {}, lb = [];
-let x2week = false;
+let x2week = false, activeGroup = 'all', matchPreds = {};
 
 window.addEventListener('load', async () => {
   if (tg) {
     tg.ready(); tg.expand();
-    tg.setHeaderColor('#0a0e1a');
-    tg.setBackgroundColor('#0a0e1a');
+    tg.setHeaderColor('#0a0e1a'); tg.setBackgroundColor('#0a0e1a');
     const u = tg.initDataUnsafe?.user;
     if (u) { uid = u.id.toString(); uname = u.first_name + (u.last_name ? ' ' + u.last_name : ''); }
   }
@@ -271,13 +366,10 @@ async function checkReg() {
 async function registerUser() {
   const n = document.getElementById('name-inp').value.trim();
   if (!n) { toast('Введи имя!', 'err'); return; }
-  await doReg(n);
-  document.getElementById('reg').style.display = 'none';
-  showApp();
+  await doReg(n); document.getElementById('reg').style.display = 'none'; showApp();
 }
 async function doReg(name) {
-  uname = name;
-  localStorage.setItem('wc26_' + uid, JSON.stringify({ name }));
+  uname = name; localStorage.setItem('wc26_' + uid, JSON.stringify({ name }));
   await api({ action: 'registerUser', user_id: uid, name });
 }
 function showApp() {
@@ -303,11 +395,8 @@ async function loadAll() {
   preds = {};
   (pd.predictions || []).forEach(p => preds[p.match_id] = p);
   lb = lbd.leaderboard || [];
-  checkX2();
-  renderMatches();
-  renderLB(lb);
-  updateScore(lb);
-  renderAdminList();
+  checkX2(); buildFilters(); renderMatches(); renderHistory();
+  renderLB(lb); updateScore(lb); renderAdminList();
 }
 
 function checkX2() {
@@ -322,12 +411,77 @@ function updateScore(l) {
   document.getElementById('uscore').textContent = (pts > 0 ? '+' : '') + pts + ' pts';
 }
 
-// ── МАТЧИ ──
+// ── ФИЛЬТРЫ ──
+function buildFilters() {
+  const open = getOpenMatches();
+  // Собираем группы из открытых матчей
+  const groups = new Set();
+  open.forEach(m => { const g = getGroup(m); if (g) groups.add(g); });
+  
+  const el = document.getElementById('group-filters');
+  const btns = [{ key: 'all', label: '🌍 Все' }, { key: 'special', label: '🌟 Особые' }];
+  [...groups].sort().forEach(g => btns.push({ key: g, label: 'Группа ' + g }));
+  
+  el.innerHTML = btns.map(b =>
+    `<button class="filter-btn ${activeGroup === b.key ? 'active' : ''}" onclick="setFilter('${b.key}')">${b.label}</button>`
+  ).join('');
+}
+
+function getGroup(m) {
+  // football-data.org добавляет группу в название типа "Group A"
+  if (m.type === 'special') return null;
+  const match = m.title.match(/Group ([A-L])/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function setFilter(g) {
+  activeGroup = g; buildFilters(); renderMatches();
+}
+
+// ── СОРТИРОВКА И ФИЛЬТРАЦИЯ ──
+function getOpenMatches() {
+  const now = new Date();
+  return matches.filter(m => !m.result && now <= new Date(m.deadline));
+}
+
+function getSortedVisibleMatches() {
+  const now = new Date();
+  let open = matches.filter(m => !m.result);
+
+  // Фильтр по группе
+  if (activeGroup === 'special') {
+    open = open.filter(m => m.type === 'special');
+  } else if (activeGroup !== 'all') {
+    open = open.filter(m => m.type === 'special' || getGroup(m) === activeGroup);
+  }
+
+  // Сортировка: особые → ближайшие открытые → закрытые без результата
+  const special = open.filter(m => m.type === 'special').sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  const openMatches = open.filter(m => m.type === 'match' && now <= new Date(m.deadline)).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  const closedNoResult = open.filter(m => m.type === 'match' && now > new Date(m.deadline)).sort((a, b) => new Date(b.deadline) - new Date(a.deadline));
+
+  // Показываем особые + ближайшие 8 матчей + закрытые без результата
+  return [...special, ...openMatches.slice(0, 8), ...closedNoResult];
+}
+
+// ── РЕНДЕР МАТЧЕЙ ──
 function renderMatches() {
   document.getElementById('pred-loader').style.display = 'none';
   const el = document.getElementById('matches');
-  if (!matches.length) { el.innerHTML = '<div class="empty"><div class="empty-ic">📅</div><div>Матчи ещё не добавлены</div></div>'; return; }
-  el.innerHTML = matches.map(buildCard).join('');
+  const visible = getSortedVisibleMatches();
+
+  // Бейдж непрогнозированных
+  const now = new Date();
+  const unpredicted = getOpenMatches().filter(m => !preds[m.id]).length;
+  const badge = document.getElementById('badge-pred');
+  if (unpredicted > 0) { badge.textContent = unpredicted; badge.style.display = 'flex'; }
+  else badge.style.display = 'none';
+
+  if (!visible.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-ic">📅</div><div>Нет активных матчей</div></div>';
+    return;
+  }
+  el.innerHTML = visible.map(buildCard).join('');
 }
 
 function buildCard(m) {
@@ -338,7 +492,7 @@ function buildCard(m) {
   const diff = dl - now, diffH = diff / 3600000;
   let dlTxt, dlCls = '';
   if (locked) { dlTxt = '🔒 Закрыт'; dlCls = 'past'; }
-  else if (diffH < 3) { dlTxt = '⏳ ' + Math.ceil(diff / 60000) + ' мин'; dlCls = 'soon'; }
+  else if (diffH < 1) { dlTxt = '⏳ ' + Math.ceil(diff / 60000) + ' мин'; dlCls = 'soon'; }
   else if (diffH < 24) { dlTxt = '⏰ ' + Math.floor(diffH) + ' ч'; dlCls = 'soon'; }
   else dlTxt = '📅 ' + dl.toLocaleDateString('ru', { day: 'numeric', month: 'short' });
 
@@ -360,7 +514,7 @@ function buildCard(m) {
       <input class="special-input" id="sp-${m.id}" type="text" placeholder="Твой ответ..." value="${p?.prediction||''}" ${locked?'disabled':''}>`;
   }
 
-  const resHtml = hasRes ? `<div class="result-badge">✅ Результат: <strong>${m.result}</strong></div>` : '';
+  const resHtml = hasRes ? `<div class="result-badge">✅ ${m.result}</div>` : '';
 
   let predInfo = '';
   if (p) {
@@ -368,9 +522,26 @@ function buildCard(m) {
     if (hasRes && p.points !== '') {
       const cls = pts > 0 ? 'pos' : pts < 0 ? 'neg' : '';
       predInfo = `<div class="pred-info"><div class="pred-val">Прогноз: <span>${p.prediction}</span>${p.is_x2?'<span class="x2-tag">x2</span>':''}</div><div class="pts ${cls}">${pts>0?'+':''}${pts} pts</div></div>`;
-    } else if (!hasRes) {
+    } else {
       predInfo = `<div class="pred-info"><div class="pred-val">Прогноз: <span>${p.prediction}</span>${p.is_x2?'<span class="x2-tag">x2</span>':''}</div><div class="pts wait">ждём ⏳</div></div>`;
     }
+  }
+
+  // Прогнозы других (только после закрытия)
+  let othersHtml = '';
+  if (locked && matchPreds[m.id]) {
+    const others = matchPreds[m.id].filter(r => r.user_id !== uid);
+    if (others.length) {
+      othersHtml = `<div class="others-preds"><div class="others-title">👥 Прогнозы игроков</div>
+        <div class="others-list">${others.map(r => {
+          const pts = Number(r.points);
+          const ptsHtml = r.points !== '' ? `<span class="opts ${pts>0?'pos':pts<0?'neg':''}">${pts>0?'+':''}${pts}</span>` : '';
+          return `<div class="other-chip ${r.is_x2?'ox2':''}"><span class="oname">${r.name}:</span><span class="oval">${r.prediction}</span>${r.is_x2?'<span class="x2-tag">x2</span>':''}${ptsHtml}</div>`;
+        }).join('')}</div></div>`;
+    }
+  } else if (locked && !matchPreds[m.id]) {
+    // Загружаем прогнозы других для закрытых матчей
+    loadMatchPreds(m.id);
   }
 
   const bottom = !locked ? `<div class="card-bottom">
@@ -378,10 +549,23 @@ function buildCard(m) {
     <button class="save-btn" onclick="save('${m.id}','${m.type}')">✓ Сохранить</button>
   </div>` : '';
 
-  return `<div class="match-card ${p?'has-pred':''} ${locked?'locked':''}" id="card-${m.id}">
-    <div class="match-header"><div class="match-type">${m.type==='match'?'⚽ Матч':'🌟 Событие'}</div><div class="match-dl ${dlCls}">${dlTxt}</div></div>
-    ${body}${resHtml}${predInfo}${bottom}
+  return `<div class="match-card ${p?'has-pred':''} ${locked?'locked':''} ${m.type==='special'?'special-card':''}" id="card-${m.id}">
+    <div class="match-header"><div class="match-type">${m.type==='match'?'⚽ '+m.title:'🌟 Событие'}</div><div class="match-dl ${dlCls}">${dlTxt}</div></div>
+    ${body}${resHtml}${predInfo}${othersHtml}${bottom}
   </div>`;
+}
+
+async function loadMatchPreds(mid) {
+  if (matchPreds[mid] !== undefined) return;
+  matchPreds[mid] = null; // loading
+  const res = await api({ action: 'getMatchPredictions', match_id: mid });
+  if (res.predictions) {
+    matchPreds[mid] = res.predictions;
+    // Обновляем карточку
+    const card = document.getElementById('card-' + mid);
+    const match = matches.find(m => m.id === mid);
+    if (match && card) card.outerHTML = buildCard(match);
+  }
 }
 
 function toggleX2(mid) {
@@ -415,7 +599,38 @@ async function save(mid, type) {
     const card = document.getElementById('card-'+mid);
     const match = matches.find(m => m.id === mid);
     if (match && card) card.outerHTML = buildCard(match);
+    updateBadge();
   }
+}
+
+function updateBadge() {
+  const now = new Date();
+  const n = getOpenMatches().filter(m => !preds[m.id]).length;
+  const badge = document.getElementById('badge-pred');
+  if (n > 0) { badge.textContent = n; badge.style.display = 'flex'; } else badge.style.display = 'none';
+}
+
+// ── ИСТОРИЯ ──
+function renderHistory() {
+  document.getElementById('hist-loader').style.display = 'none';
+  const el = document.getElementById('hist-list');
+  const finished = matches.filter(m => m.result).sort((a, b) => new Date(b.deadline) - new Date(a.deadline));
+  if (!finished.length) { el.innerHTML = '<div class="empty"><div class="empty-ic">📋</div><div>Сыгранных матчей пока нет</div></div>'; return; }
+  el.innerHTML = finished.map(m => {
+    const p = preds[m.id];
+    const pts = p ? Number(p.points) : null;
+    const ptsHtml = p && p.points !== '' ? `<div class="pts ${pts>0?'pos':pts<0?'neg':''}">${pts>0?'+':''}${pts} pts</div>` : '<div class="pts wait">—</div>';
+    return `<div class="hist-card">
+      <div class="hist-header">
+        <div class="hist-title">${m.type==='match'?F(m.team1)+' '+m.team1+' vs '+m.team2+' '+F(m.team2):m.title}</div>
+        <div class="hist-result">✅ ${m.result}</div>
+      </div>
+      <div class="hist-pred">
+        <div class="hist-pred-val">${p ? 'Прогноз: <span>'+p.prediction+'</span>'+(p.is_x2?'<span class="x2-tag">x2</span>':'') : '<span style="color:var(--muted)">Не сделан</span>'}</div>
+        ${ptsHtml}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── ЛИДЕРБОРД ──
@@ -423,8 +638,7 @@ async function loadLB() {
   document.getElementById('lb-loader').style.display = 'block';
   document.getElementById('lb-list').style.display = 'none';
   const d = await api({ action: 'getLeaderboard' });
-  lb = d.leaderboard || [];
-  renderLB(lb); updateScore(lb);
+  lb = d.leaderboard || []; renderLB(lb); updateScore(lb);
 }
 function renderLB(l) {
   document.getElementById('lb-loader').style.display = 'none';
@@ -432,7 +646,7 @@ function renderLB(l) {
   if (!l.length) { el.innerHTML = '<div class="empty"><div class="empty-ic">🏆</div><div>Пока пусто</div></div>'; el.style.display='block'; return; }
   const ranks=['gold','silver','bronze'], medals=['🥇','🥈','🥉'];
   el.innerHTML = l.map((p,i) => {
-    const isMe = p.user_id === uid;
+    const isMe = p.user_id===uid;
     const ini = p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
     const pts = Math.round(p.points*10)/10;
     return `<div class="lb-row ${isMe?'me':''}">
@@ -442,27 +656,26 @@ function renderLB(l) {
       <div><div class="lb-pts">${pts>0?'+':''}${pts}</div><div class="lb-pts-lbl">очков</div></div>
     </div>`;
   }).join('');
-  el.style.display = 'block';
+  el.style.display='block';
 }
 
 // ── СТАТИСТИКА ──
 async function loadStats() {
-  document.getElementById('stats-loader').style.display = 'block';
-  document.getElementById('stats-content').style.display = 'none';
-  const lbd = await api({ action: 'getLeaderboard' });
-  const l = lbd.leaderboard || [];
-  const fin = matches.filter(m => m.result);
+  document.getElementById('stats-loader').style.display='block';
+  document.getElementById('stats-content').style.display='none';
+  const lbd = await api({ action:'getLeaderboard' });
+  const l = lbd.leaderboard||[];
+  const fin = matches.filter(m=>m.result);
   const myP = Object.values(preds);
-  const myFin = myP.filter(p => matches.find(m => m.id===p.match_id&&m.result));
-  const myOk = myFin.filter(p => Number(p.points) > 0).length;
-  const myPct = myFin.length ? Math.round(myOk/myFin.length*100) : 0;
-  const myTotal = myP.reduce((s,p) => s+(Number(p.points)||0), 0);
-  const myX2 = myP.filter(p => p.is_x2).length;
-  const me = l.find(r => r.user_id===uid);
-  const myRank = me ? l.indexOf(me)+1 : '-';
-
-  document.getElementById('stats-loader').style.display = 'none';
-  document.getElementById('stats-content').innerHTML = `
+  const myFin = myP.filter(p=>matches.find(m=>m.id===p.match_id&&m.result));
+  const myOk = myFin.filter(p=>Number(p.points)>0).length;
+  const myPct = myFin.length?Math.round(myOk/myFin.length*100):0;
+  const myTotal = myP.reduce((s,p)=>s+(Number(p.points)||0),0);
+  const myX2 = myP.filter(p=>p.is_x2).length;
+  const me = l.find(r=>r.user_id===uid);
+  const myRank = me?l.indexOf(me)+1:'-';
+  document.getElementById('stats-loader').style.display='none';
+  document.getElementById('stats-content').innerHTML=`
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-val">${myRank}</div><div class="stat-lbl">Моё место</div></div>
       <div class="stat-card"><div class="stat-val">${myTotal>0?'+':''}${Math.round(myTotal*10)/10}</div><div class="stat-lbl">Мои очки</div></div>
@@ -472,28 +685,25 @@ async function loadStats() {
     </div>
     <div class="section-title">По игрокам</div>
     <div class="lb-card">
-      ${l.length ? l.map((p,i) => {
-        const max = l[0]?.points||1, pct = Math.max(0,Math.round(p.points/max*100));
-        return `<div class="ps-row">
-          <div class="lb-rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</div>
-          <div class="ps-name">${p.name}</div>
-          <div class="ps-bar"><div class="prog" style="margin:0"><div class="prog-fill" style="width:${pct}%"></div></div></div>
-          <div class="ps-pts">${Math.round(p.points*10)/10}</div>
-        </div>`;
-      }).join('') : '<div class="empty" style="padding:16px">Пока нет данных</div>'}
+      ${l.length?l.map((p,i)=>{const max=l[0]?.points||1,pct=Math.max(0,Math.round(p.points/max*100));return`<div class="ps-row"><div class="lb-rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</div><div class="ps-name">${p.name}</div><div class="ps-bar"><div class="prog" style="margin:0"><div class="prog-fill" style="width:${pct}%"></div></div></div><div class="ps-pts">${Math.round(p.points*10)/10}</div></div>`;}).join(''):'<div class="empty" style="padding:14px">Пока нет данных</div>'}
     </div>`;
-  document.getElementById('stats-content').style.display = 'block';
+  document.getElementById('stats-content').style.display='block';
 }
 
 // ── АДМИН ──
 function renderAdminList() {
   const el = document.getElementById('admin-list');
-  if (!matches.length) { el.innerHTML = '<div class="empty"><div>Матчей пока нет</div></div>'; return; }
-  el.innerHTML = matches.map(m => `
-    <div class="admin-card">
-      <div class="admin-title">${m.type==='match'?'⚽':'🌟'} ${m.title||m.team1+' vs '+m.team2}</div>
+  if (!matches.length) { el.innerHTML='<div class="empty"><div>Матчей пока нет</div></div>'; return; }
+  // Сначала особые, потом матчи
+  const sorted = [...matches.filter(m=>m.type==='special'), ...matches.filter(m=>m.type!=='special')];
+  el.innerHTML = sorted.map(m=>`
+    <div class="admin-card" id="acard-${m.id}">
+      <div class="admin-title">
+        <span>${m.type==='match'?'⚽':'🌟'} ${m.title||m.team1+' vs '+m.team2}</span>
+        <button class="del-btn" onclick="deleteMatch('${m.id}')" title="Удалить">🗑️</button>
+      </div>
       ${m.result?`<div class="res-set">✅ ${m.result}</div>`:''}
-      <div class="admin-row" style="margin-top:8px">
+      <div class="admin-row" style="margin-top:7px">
         <input class="admin-input" id="res-${m.id}" type="text" placeholder="${m.type==='match'?'напр. 2:1':'результат'}" value="${m.result||''}">
         <button class="admin-btn" onclick="setResult('${m.id}')">✓</button>
       </div>
@@ -502,40 +712,47 @@ function renderAdminList() {
 
 async function setResult(mid) {
   const result = document.getElementById('res-'+mid)?.value.trim();
-  if (!result) { toast('Введи результат!', 'err'); return; }
-  const res = await api({ action: 'setResult', match_id: mid, result, admin_key: ADMIN_KEY });
-  if (res.error) toast(res.error, 'err');
-  else { toast('✅ Результат сохранён!', 'ok'); await loadAll(); }
+  if (!result) { toast('Введи результат!','err'); return; }
+  const res = await api({ action:'setResult', match_id:mid, result, admin_key:ADMIN_KEY });
+  if (res.error) toast(res.error,'err');
+  else { toast('✅ Результат сохранён!','ok'); await loadAll(); }
+}
+
+async function deleteMatch(mid) {
+  if (!confirm('Удалить это событие?')) return;
+  const res = await api({ action:'deleteMatch', match_id:mid, admin_key:ADMIN_KEY });
+  if (res.error) toast(res.error,'err');
+  else { toast('🗑️ Удалено','ok'); matches = matches.filter(m=>m.id!==mid); renderAdminList(); renderMatches(); }
 }
 
 async function importMatches() {
   const key = document.getElementById('api-key').value.trim();
-  if (!key) { toast('Введи API-ключ!', 'err'); return; }
-  toast('⏳ Импортируем...', 'info');
-  const res = await api({ action: 'importWC2026Matches', api_key: key, admin_key: ADMIN_KEY });
-  if (res.error) toast('Ошибка: ' + res.error, 'err');
-  else { toast('✅ Импортировано ' + res.imported + ' матчей!', 'ok'); await loadAll(); }
+  if (!key) { toast('Введи API-ключ!','err'); return; }
+  toast('⏳ Импортируем...','info');
+  const res = await api({ action:'importWC2026Matches', api_key:key, admin_key:ADMIN_KEY });
+  if (res.error) toast('Ошибка: '+res.error,'err');
+  else { toast('✅ Импортировано '+res.imported+' матчей!','ok'); await loadAll(); }
 }
 
 function toggleTeams() {
-  document.getElementById('ev-teams').style.display = document.getElementById('ev-type').value==='match' ? 'flex' : 'none';
+  document.getElementById('ev-teams').style.display = document.getElementById('ev-type').value==='match'?'flex':'none';
 }
 async function addEvent() {
-  const title = document.getElementById('ev-title').value.trim();
-  const type = document.getElementById('ev-type').value;
-  const t1 = document.getElementById('ev-t1').value.trim();
-  const t2 = document.getElementById('ev-t2').value.trim();
-  const dl = document.getElementById('ev-dl').value;
-  if (!title || !dl) { toast('Заполни название и дедлайн!', 'err'); return; }
-  const res = await api({ action: 'addMatch', title: type==='match'?t1+' vs '+t2:title, team1:t1, team2:t2, deadline:new Date(dl).toISOString(), type });
-  if (res.error) toast(res.error, 'err');
-  else { toast('✅ Добавлено!', 'ok'); ['ev-title','ev-t1','ev-t2','ev-dl'].forEach(id=>document.getElementById(id).value=''); await loadAll(); }
+  const title=document.getElementById('ev-title').value.trim();
+  const type=document.getElementById('ev-type').value;
+  const t1=document.getElementById('ev-t1').value.trim();
+  const t2=document.getElementById('ev-t2').value.trim();
+  const dl=document.getElementById('ev-dl').value;
+  if (!title||!dl) { toast('Заполни название и дедлайн!','err'); return; }
+  const res = await api({ action:'addMatch', title:type==='match'?t1+' vs '+t2:title, team1:t1, team2:t2, deadline:new Date(dl).toISOString(), type });
+  if (res.error) toast(res.error,'err');
+  else { toast('✅ Добавлено!','ok'); ['ev-title','ev-t1','ev-t2','ev-dl'].forEach(id=>document.getElementById(id).value=''); await loadAll(); }
 }
 
 // ── ТАБЫ ──
 function switchTab(tab, el) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   if (el) el.classList.add('active');
   document.getElementById('page-'+tab).classList.add('active');
   if (tab==='lb') loadLB();
@@ -544,10 +761,10 @@ function switchTab(tab, el) {
 
 let tt;
 function toast(msg, type='info') {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'toast ' + type;
-  setTimeout(() => t.classList.add('show'), 10);
-  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2800);
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast '+type;
+  setTimeout(()=>t.classList.add('show'),10);
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2800);
 }
 </script>
 </body>
