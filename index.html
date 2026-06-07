@@ -569,25 +569,16 @@ async function setResult(mid){
 }
 
 async function importMatches(){
-  const apiKey=document.getElementById('api-key-input').value.trim();
-  if(!apiKey){showToast('Введи API-ключ!','error');return;}
+  const apiKey = document.getElementById('api-key-input').value.trim();
+  if(!apiKey){ showToast('Введи API-ключ!','error'); return; }
   showToast('⏳ Импортируем...','info');
-  try{
-    const res=await fetch('https://api.football-data.org/v4/competitions/WC/matches?season=2026',{
-      headers:{'X-Auth-Token':apiKey}
-    });
-    const data=await res.json();
-    if(!data.matches){showToast('Ошибка API. Проверь ключ.','error');return;}
-    let imported=0;
-    for(const match of data.matches.slice(0,64)){
-      const t1=match.homeTeam.name,t2=match.awayTeam.name;
-      const dl=new Date(match.utcDate);dl.setMinutes(dl.getMinutes()-30);
-      await apiCall({action:'addMatch',title:t1+' vs '+t2,team1:t1,team2:t2,deadline:dl.toISOString(),type:'match'});
-      imported++;
-    }
-    showToast('✅ Импортировано '+imported+' матчей!','success');
-    await loadAll();
-  }catch(e){showToast('Ошибка: '+e.message,'error');}
+  const res = await apiCall({
+    action: 'importWC2026Matches',
+    api_key: apiKey,
+    admin_key: ADMIN_KEY
+  });
+  if(res.error){ showToast('Ошибка: '+res.error,'error'); }
+  else{ showToast('✅ Импортировано '+res.imported+' матчей!','success'); await loadAll(); }
 }
 
 function toggleTeamsRow(){
