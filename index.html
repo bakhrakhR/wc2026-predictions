@@ -376,7 +376,16 @@ window.addEventListener('load',async()=>{
 
 async function checkReg(){
   const s=localStorage.getItem('wc26_'+uid);
-  if(s){uname=JSON.parse(s).name;showApp();}
+  if(s){
+    uname=JSON.parse(s).name;
+    // Всегда синхронизируем имя в Supabase (исправляет случай user_id вместо имени)
+    await fetch(SB_URL+'/rest/v1/users?on_conflict=user_id',{
+      method:'POST',
+      headers:{...SB_HEADERS,'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({user_id:uid,name:uname})
+    });
+    showApp();
+  }
   else if(uname){await doReg(uname);showApp();}
   else document.getElementById('reg').style.display='flex';
 }
@@ -519,6 +528,7 @@ async function save(mid,type){
   saving[mid]=true;
   // Оптимистичное обновление
   preds[mid]={match_id:parseInt(mid),prediction,is_x2:isX2,points:null};
+  renderHistory(); // обновляем историю сразу
   const res=await sbRpc('upsert_prediction',{p_user_id:uid,p_match_id:parseInt(mid),p_prediction:prediction,p_is_x2:isX2});
   saving[mid]=false;
   if(res?.error){toast(res.error,'err');delete preds[mid];}else toast(isX2?'⚡ Прогноз x2 сохранён!':'✅ Прогноз сохранён!','ok');
