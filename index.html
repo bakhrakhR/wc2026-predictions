@@ -383,7 +383,12 @@ async function checkReg(){
 async function registerUser(){const n=document.getElementById('name-inp').value.trim();if(!n){toast('Введи имя!','err');return;}await doReg(n);document.getElementById('reg').style.display='none';showApp();}
 async function doReg(name){
   uname=name;localStorage.setItem('wc26_'+uid,JSON.stringify({name}));
-  await sbPost('users',{user_id:uid,name},'resolution=merge-duplicates,return=minimal');
+  // Явный upsert с обновлением имени через on_conflict
+  await fetch(SB_URL+'/rest/v1/users?on_conflict=user_id',{
+    method:'POST',
+    headers:{...SB_HEADERS,'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({user_id:uid,name})
+  });
 }
 function showApp(){document.getElementById('uname').textContent=uname;document.getElementById('app').style.display='block';loadAll();}
 
@@ -537,13 +542,33 @@ function updateBadge(){const now=new Date();const n=matches.filter(m=>!m.result&
 function renderHistory(){
   const el=document.getElementById('hist-list');
   const fin=matches.filter(m=>m.result).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
-  if(!fin.length){el.innerHTML='<div class="empty"><div class="empty-ic">📋</div><div>Сыгранных матчей пока нет</div></div>';return;}
-  el.innerHTML=fin.map(m=>{
-    const p=preds[m.id],pts=p?Number(p.points):null;
-    const ph=p&&p.points!=null?'<div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'">'+(pts>0?'+':'')+pts+' pts</div>':'<div class="pts wait">—</div>';
-    return'<div class="hist-card"><div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' vs '+m.team2:m.title)+'</div><div class="hist-res">✅ '+m.result+'</div></div>'+
-      '<div class="hist-pred-row"><div class="hist-pred-val">'+(p?'Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':''):'<span style="color:var(--muted)">Не сделан</span>')+'</div>'+ph+'</div></div>';
-  }).join('');
+  const now=new Date();
+  const pending=matches.filter(m=>!m.result&&preds[m.id]).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+  if(!fin.length&&!pending.length){
+    el.innerHTML='<div class="empty"><div class="empty-ic">📋</div><div>Сделай первый прогноз — он появится здесь</div></div>';return;
+  }
+  let html='';
+  if(pending.length){
+    html+='<div class="section-title" style="margin-top:0">Ожидают результата</div>';
+    html+=pending.map(m=>{
+      const p=preds[m.id],locked=now>new Date(m.deadline);
+      return'<div class="hist-card" style="border-color:#2a3d5e">'+
+        '<div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' vs '+m.team2:m.title)+'</div>'+
+        '<div style="font-size:10px;color:var(--muted)">'+(locked?'🔒 Закрыт':'📅 '+fmtTime(m.deadline))+'</div></div>'+
+        '<div class="hist-pred-row"><div class="hist-pred-val">Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div>'+
+        '<div class="pts wait">⏳ ждём</div></div></div>';
+    }).join('');
+  }
+  if(fin.length){
+    html+='<div class="section-title" style="margin-top:'+(pending.length?'14px':'0')+'">Сыгранные</div>';
+    html+=fin.map(m=>{
+      const p=preds[m.id],pts=p?Number(p.points):null;
+      const ph=p&&p.points!=null?'<div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'">'+(pts>0?'+':'')+pts+' pts</div>':'<div class="pts wait">—</div>';
+      return'<div class="hist-card"><div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' vs '+m.team2:m.title)+'</div><div class="hist-res">✅ '+m.result+'</div></div>'+
+        '<div class="hist-pred-row"><div class="hist-pred-val">'+(p?'Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':''):'<span style="color:var(--muted)">Не сделан</span>')+'</div>'+ph+'</div></div>';
+    }).join('');
+  }
+  el.innerHTML=html;
 }
 
 // ── ЛИДЕРБОРД ─────────────────────────────────────────────────────────────────
