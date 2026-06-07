@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>? ?? 2026 ????????</title>
+<title>⚽ ЧМ 2026 Прогнозы</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -42,7 +42,7 @@
   .match-deadline.soon{color:var(--accent2);}
   .match-deadline.locked-dl{color:var(--red);}
 
-  /* SCORE INPUT - ????? ????????? */
+  /* SCORE INPUT - новый интерфейс */
   .score-row{display:flex;align-items:flex-end;justify-content:center;padding:10px 14px 14px;gap:12px;}
   .team-block{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;max-width:120px;}
   .team-flag{font-size:32px;line-height:1;}
@@ -153,75 +153,75 @@
 <body>
 
 <div id="register-screen" class="register-screen" style="display:none">
-  <div class="register-icon">?</div>
-  <div class="register-title">?? 2026<br>????????</div>
-  <div class="register-sub">????? ???? ??? ????? ???????????</div>
-  <input class="register-input" id="name-input" type="text" placeholder="???? ???" maxlength="20">
-  <button class="register-btn" onclick="registerUser()">?????????????? ??</button>
+  <div class="register-icon">⚽</div>
+  <div class="register-title">ЧМ 2026<br>Прогнозы</div>
+  <div class="register-sub">Введи своё имя чтобы участвовать</div>
+  <input class="register-input" id="name-input" type="text" placeholder="Твоё имя" maxlength="20">
+  <button class="register-btn" onclick="registerUser()">Присоединиться 🚀</button>
 </div>
 
 <div id="main-app" style="display:none">
   <div class="header">
     <div class="header-top">
-      <div class="logo">?? <span>2026</span></div>
+      <div class="logo">ЧМ <span>2026</span></div>
       <div class="user-badge">
         <span id="user-name-badge">—</span>
         <span class="score" id="user-score-badge">0 pts</span>
       </div>
     </div>
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('predictions',this)">? ????????</button>
-      <button class="tab" onclick="switchTab('leaderboard',this)">?? ?????????</button>
-      <button class="tab" onclick="switchTab('stats',this)">?? ??????????</button>
-      <button class="tab admin-tab" id="admin-tab" style="display:none" onclick="switchTab('admin',this)">?? ?????</button>
+      <button class="tab active" onclick="switchTab('predictions',this)">⚽ Прогнозы</button>
+      <button class="tab" onclick="switchTab('leaderboard',this)">🏆 Лидерборд</button>
+      <button class="tab" onclick="switchTab('stats',this)">📊 Статистика</button>
+      <button class="tab admin-tab" id="admin-tab" style="display:none" onclick="switchTab('admin',this)">⚙️ Админ</button>
     </div>
   </div>
 
   <div class="page active" id="page-predictions">
-    <div class="loader" id="matches-loader"><div class="spinner"></div>????????? ?????...</div>
+    <div class="loader" id="matches-loader"><div class="spinner"></div>Загружаем матчи...</div>
     <div id="matches-list"></div>
   </div>
 
   <div class="page" id="page-leaderboard">
-    <div class="refresh-row"><button class="refresh-btn" onclick="loadLeaderboard()">? ????????</button></div>
-    <div class="section-title">???????</div>
+    <div class="refresh-row"><button class="refresh-btn" onclick="loadLeaderboard()">↻ Обновить</button></div>
+    <div class="section-title">Таблица</div>
     <div class="loader" id="lb-loader"><div class="spinner"></div></div>
     <div class="lb-card" id="lb-list" style="display:none"></div>
   </div>
 
   <div class="page" id="page-stats">
-    <div class="loader" id="stats-loader"><div class="spinner"></div>???????...</div>
+    <div class="loader" id="stats-loader"><div class="spinner"></div>Считаем...</div>
     <div id="stats-content" style="display:none"></div>
   </div>
 
   <div class="page" id="page-admin">
     <div class="import-box">
-      <div class="import-title">?? ?????? ?????? ?? 2026</div>
-      <div class="import-sub">????? API-???? ? football-data.org ????? ????????? ??? ????? ?????????????</div>
-      <input class="api-key-input" id="api-key-input" type="text" placeholder="?????? API-????...">
-      <button class="import-btn" onclick="importMatches()">? ????????????? ?????</button>
+      <div class="import-title">🌐 Импорт матчей ЧМ 2026</div>
+      <div class="import-sub">Введи API-ключ с football-data.org чтобы загрузить все матчи автоматически</div>
+      <input class="api-key-input" id="api-key-input" type="text" placeholder="Вставь API-ключ...">
+      <button class="import-btn" onclick="importMatches()">⚡ Импортировать матчи</button>
     </div>
 
     <div class="add-event-box">
-      <div class="add-event-title">? ???????? ???? ???????</div>
+      <div class="add-event-title">➕ Добавить своё событие</div>
       <div class="add-row">
-        <input class="add-input" id="ev-title" type="text" placeholder="???????? ???????">
+        <input class="add-input" id="ev-title" type="text" placeholder="Название события">
         <select class="add-input" id="ev-type" style="max-width:120px" onchange="toggleTeamsRow()">
-          <option value="special">?? ???????</option>
-          <option value="match">? ????</option>
+          <option value="special">🌟 Событие</option>
+          <option value="match">⚽ Матч</option>
         </select>
       </div>
       <div class="add-row" id="ev-teams-row" style="display:none">
-        <input class="add-input" id="ev-team1" type="text" placeholder="??????? 1">
-        <input class="add-input" id="ev-team2" type="text" placeholder="??????? 2">
+        <input class="add-input" id="ev-team1" type="text" placeholder="Команда 1">
+        <input class="add-input" id="ev-team2" type="text" placeholder="Команда 2">
       </div>
       <div class="add-row">
         <input class="add-input" id="ev-deadline" type="datetime-local">
-        <button class="admin-btn" onclick="addEvent()" style="padding:10px 16px">????????</button>
+        <button class="admin-btn" onclick="addEvent()" style="padding:10px 16px">Добавить</button>
       </div>
     </div>
 
-    <div class="section-title">??????????</div>
+    <div class="section-title">Результаты</div>
     <div id="admin-matches-list">
       <div class="loader"><div class="spinner"></div></div>
     </div>
@@ -233,25 +233,25 @@
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbyLJ-efaVw_W-MgDVJJgaPhPqnxiNYTfl5VUP7au3bv19rcn2CQ3mfgMnMl18tvxSftXQ/exec';
 const ADMIN_KEY = 'WC2026ADMIN';
-// ?? ???? ?????? ???? Telegram user_id (?????) ????? ?????? ??????? ?????
+// ⬇️ Сюда вставь свой Telegram user_id (число) чтобы видеть вкладку Админ
 const ADMIN_IDS = ['YOUR_TELEGRAM_ID'];
 
 const FLAGS = {
-  '?????????':'????','Argentina':'????','???????':'????','France':'????',
-  '????????':'????','Brazil':'????','????????':'????','Germany':'????',
-  '???????':'????','Spain':'????','??????????':'????','Portugal':'????',
-  '??????':'??????????????','England':'??????????????','??????????':'????','Netherlands':'????',
-  '???????':'????','Belgium':'????','????????':'????','Croatia':'????',
-  '???????':'????','Morocco':'????','??????':'????','Japan':'????',
-  '???????':'????','Mexico':'????','???':'????','United States':'????',
-  '??????':'????','Canada':'????','?????????':'????','Australia':'????',
-  '???????':'????','Senegal':'????','???????':'????','Uruguay':'????',
-  '????????':'????','Colombia':'????','?????????':'????','Switzerland':'????',
-  '??????':'????','Turkey':'????','??????':'????','Italy':'????',
-  '??????':'????','Serbia':'????','??????':'????','Poland':'????',
-  '????? ?????':'????','South Korea':'????','????':'????','Iran':'????',
+  'Аргентина':'🇦🇷','Argentina':'🇦🇷','Франция':'🇫🇷','France':'🇫🇷',
+  'Бразилия':'🇧🇷','Brazil':'🇧🇷','Германия':'🇩🇪','Germany':'🇩🇪',
+  'Испания':'🇪🇸','Spain':'🇪🇸','Португалия':'🇵🇹','Portugal':'🇵🇹',
+  'Англия':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Нидерланды':'🇳🇱','Netherlands':'🇳🇱',
+  'Бельгия':'🇧🇪','Belgium':'🇧🇪','Хорватия':'🇭🇷','Croatia':'🇭🇷',
+  'Марокко':'🇲🇦','Morocco':'🇲🇦','Япония':'🇯🇵','Japan':'🇯🇵',
+  'Мексика':'🇲🇽','Mexico':'🇲🇽','США':'🇺🇸','United States':'🇺🇸',
+  'Канада':'🇨🇦','Canada':'🇨🇦','Австралия':'🇦🇺','Australia':'🇦🇺',
+  'Сенегал':'🇸🇳','Senegal':'🇸🇳','Уругвай':'🇺🇾','Uruguay':'🇺🇾',
+  'Колумбия':'🇨🇴','Colombia':'🇨🇴','Швейцария':'🇨🇭','Switzerland':'🇨🇭',
+  'Турция':'🇹🇷','Turkey':'🇹🇷','Италия':'🇮🇹','Italy':'🇮🇹',
+  'Сербия':'🇷🇸','Serbia':'🇷🇸','Польша':'🇵🇱','Poland':'🇵🇱',
+  'Южная Корея':'🇰🇷','South Korea':'🇰🇷','Иран':'🇮🇷','Iran':'🇮🇷',
 };
-function getFlag(n){return FLAGS[n]||'???';}
+function getFlag(n){return FLAGS[n]||'🏳️';}
 
 let tg=window.Telegram?.WebApp;
 let userId,userName,matches=[],userPredictions={},leaderboard=[];
@@ -279,7 +279,7 @@ async function checkRegistration(){
 }
 async function registerUser(){
   const n=document.getElementById('name-input').value.trim();
-  if(!n){showToast('????? ???!','error');return;}
+  if(!n){showToast('Введи имя!','error');return;}
   await doRegister(n);
   document.getElementById('register-screen').style.display='none';
   showApp();
@@ -333,11 +333,11 @@ function updateUserScore(lb){
   document.getElementById('user-score-badge').textContent=(pts>0?'+':'')+pts+' pts';
 }
 
-// ?? MATCH CARDS ???????????????????????????????????????????????????????????????
+// ── MATCH CARDS ───────────────────────────────────────────────────────────────
 function renderMatches(){
   document.getElementById('matches-loader').style.display='none';
   const list=document.getElementById('matches-list');
-  if(!matches.length){list.innerHTML='<div class="empty"><div class="empty-icon">??</div><div>????? ??? ?? ?????????</div></div>';return;}
+  if(!matches.length){list.innerHTML='<div class="empty"><div class="empty-icon">📅</div><div>Матчи ещё не добавлены</div></div>';return;}
   list.innerHTML=matches.map(m=>buildMatchCard(m)).join('');
 }
 
@@ -349,10 +349,10 @@ function buildMatchCard(m){
 
   const diffMs=deadline-now,diffH=diffMs/3600000;
   let dlText,dlClass='';
-  if(isLocked){dlText='?? ??????';dlClass='locked-dl';}
-  else if(diffH<3){dlText='? '+Math.ceil(diffMs/60000)+' ???';dlClass='soon';}
-  else if(diffH<24){dlText='? '+Math.floor(diffH)+' ?';dlClass='soon';}
-  else{dlText='?? '+deadline.toLocaleDateString('ru',{day:'numeric',month:'short'});}
+  if(isLocked){dlText='🔒 Закрыт';dlClass='locked-dl';}
+  else if(diffH<3){dlText='⏳ '+Math.ceil(diffMs/60000)+' мин';dlClass='soon';}
+  else if(diffH<24){dlText='⏰ '+Math.floor(diffH)+' ч';dlClass='soon';}
+  else{dlText='📅 '+deadline.toLocaleDateString('ru',{day:'numeric',month:'short'});}
 
   const thisPredIsX2=pred?.is_x2;
   const canX2=!isLocked&&(!x2UsedThisWeek||thisPredIsX2);
@@ -378,12 +378,12 @@ function buildMatchCard(m){
       </div>
     </div>`;
   } else {
-    bodyHtml=`<div class="special-title">?? ${m.title}</div>
+    bodyHtml=`<div class="special-title">🌟 ${m.title}</div>
       <input class="special-input" id="sp-${m.id}" type="text"
-        placeholder="???? ?????..." value="${pred?.prediction||''}" ${isLocked?'disabled':''}>`;
+        placeholder="Твой ответ..." value="${pred?.prediction||''}" ${isLocked?'disabled':''}>`;
   }
 
-  const resultHtml=hasResult?`<div class="result-badge">? ?????????: <strong>${m.result}</strong></div>`:'';
+  const resultHtml=hasResult?`<div class="result-badge">✅ Результат: <strong>${m.result}</strong></div>`:'';
 
   let predInfoHtml='';
   if(pred){
@@ -391,17 +391,17 @@ function buildMatchCard(m){
     if(hasResult&&pred.points!==''){
       const cls=pts>0?'pos':pts<0?'neg':'';
       predInfoHtml=`<div class="pred-info">
-        <div class="pred-preview">???????: <span class="val">${pred.prediction}</span>
+        <div class="pred-preview">Прогноз: <span class="val">${pred.prediction}</span>
           ${pred.is_x2?'<span class="x2-tag">x2</span>':''}
         </div>
         <div class="pts-value ${cls}">${pts>0?'+':''}${pts} pts</div>
       </div>`;
     } else if(!hasResult){
       predInfoHtml=`<div class="pred-info">
-        <div class="pred-preview">???????: <span class="val">${pred.prediction}</span>
+        <div class="pred-preview">Прогноз: <span class="val">${pred.prediction}</span>
           ${pred.is_x2?'<span class="x2-tag">x2</span>':''}
         </div>
-        <div class="pts-value pending">???? ?</div>
+        <div class="pts-value pending">ждём ⏳</div>
       </div>`;
     }
   }
@@ -410,15 +410,15 @@ function buildMatchCard(m){
     <button class="x2-btn ${thisPredIsX2?'active':''}" id="x2-${m.id}"
       onclick="toggleX2('${m.id}')"
       ${!canX2&&!thisPredIsX2?'disabled':''}
-      title="${x2UsedThisWeek&&!thisPredIsX2?'x2 ??? ???????????':'?????? x2'}">
-      ? x2
+      title="${x2UsedThisWeek&&!thisPredIsX2?'x2 уже использован':'Ставка x2'}">
+      ⚡ x2
     </button>
-    <button class="save-btn" onclick="savePrediction('${m.id}','${m.type}')">? ?????????</button>
+    <button class="save-btn" onclick="savePrediction('${m.id}','${m.type}')">✓ Сохранить</button>
   </div>`:'';
 
   return `<div class="match-card ${pred?'has-prediction':''} ${isLocked?'locked':''}" id="card-${m.id}">
     <div class="match-header">
-      <div class="match-type">${m.type==='match'?'? ????':'?? ???????'}</div>
+      <div class="match-type">${m.type==='match'?'⚽ Матч':'🌟 Событие'}</div>
       <div class="match-deadline ${dlClass}">${dlText}</div>
     </div>
     ${bodyHtml}${resultHtml}${predInfoHtml}${bottomHtml}
@@ -442,20 +442,20 @@ async function savePrediction(mid,type){
   if(type==='match'){
     const s1=document.getElementById('s1-'+mid)?.value;
     const s2=document.getElementById('s2-'+mid)?.value;
-    if(s1===''||s2===''||s1==null||s2==null){showToast('????? ????!','error');return;}
+    if(s1===''||s2===''||s1==null||s2==null){showToast('Введи счёт!','error');return;}
     prediction=s1+':'+s2;
   } else {
     prediction=document.getElementById('sp-'+mid)?.value.trim();
-    if(!prediction){showToast('????? ?????!','error');return;}
+    if(!prediction){showToast('Введи ответ!','error');return;}
   }
   const isX2=document.getElementById('x2-'+mid)?.classList.contains('active')||false;
   const btn=document.querySelector(`#card-${mid} .save-btn`);
   if(btn){btn.textContent='...';btn.disabled=true;}
   const res=await apiCall({action:'savePrediction',user_id:userId,match_id:mid,prediction,is_x2:isX2.toString()});
-  if(btn){btn.textContent='? ?????????';btn.disabled=false;}
+  if(btn){btn.textContent='✓ Сохранить';btn.disabled=false;}
   if(res.error){showToast(res.error,'error');}
   else{
-    showToast(isX2?'? ??????? x2 ????????!':'? ??????? ????????!','success');
+    showToast(isX2?'⚡ Прогноз x2 сохранён!':'✅ Прогноз сохранён!','success');
     userPredictions[mid]={prediction,is_x2:isX2,points:''};
     if(isX2)x2UsedThisWeek=true;
     const card=document.getElementById('card-'+mid);
@@ -464,7 +464,7 @@ async function savePrediction(mid,type){
   }
 }
 
-// ?? LEADERBOARD ???????????????????????????????????????????????????????????????
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
 async function loadLeaderboard(){
   document.getElementById('lb-loader').style.display='block';
   document.getElementById('lb-list').style.display='none';
@@ -476,8 +476,8 @@ async function loadLeaderboard(){
 function renderLeaderboard(lb){
   document.getElementById('lb-loader').style.display='none';
   const list=document.getElementById('lb-list');
-  if(!lb.length){list.innerHTML='<div class="empty"><div class="empty-icon">??</div><div>???? ?????</div></div>';list.style.display='block';return;}
-  const ranks=['gold','silver','bronze'],medals=['??','??','??'];
+  if(!lb.length){list.innerHTML='<div class="empty"><div class="empty-icon">🏆</div><div>Пока пусто</div></div>';list.style.display='block';return;}
+  const ranks=['gold','silver','bronze'],medals=['🥇','🥈','🥉'];
   list.innerHTML=lb.map((p,i)=>{
     const isMe=p.user_id===userId;
     const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
@@ -485,14 +485,14 @@ function renderLeaderboard(lb){
     return `<div class="lb-row ${isMe?'me':''}">
       <div class="lb-rank ${i<3?ranks[i]:''}">${i<3?medals[i]:i+1}</div>
       <div class="lb-avatar">${ini}</div>
-      <div class="lb-name">${p.name}${isMe?' ??':''}</div>
-      <div><div class="lb-pts">${pts>0?'+':''}${pts}</div><div class="lb-pts-label">?????</div></div>
+      <div class="lb-name">${p.name}${isMe?' 👈':''}</div>
+      <div><div class="lb-pts">${pts>0?'+':''}${pts}</div><div class="lb-pts-label">очков</div></div>
     </div>`;
   }).join('');
   list.style.display='block';
 }
 
-// ?? STATS ?????????????????????????????????????????????????????????????????????
+// ── STATS ─────────────────────────────────────────────────────────────────────
 async function loadStats(){
   document.getElementById('stats-loader').style.display='block';
   document.getElementById('stats-content').style.display='none';
@@ -511,21 +511,21 @@ async function loadStats(){
 
   const content=`
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-value">${myRank}</div><div class="stat-label">??? ?????</div></div>
-      <div class="stat-card"><div class="stat-value">${myTotal>0?'+':''}${Math.round(myTotal*10)/10}</div><div class="stat-label">??? ????</div></div>
+      <div class="stat-card"><div class="stat-value">${myRank}</div><div class="stat-label">Моё место</div></div>
+      <div class="stat-card"><div class="stat-value">${myTotal>0?'+':''}${Math.round(myTotal*10)/10}</div><div class="stat-label">Мои очки</div></div>
       <div class="stat-card">
         <div class="stat-value">${myPct}%</div>
-        <div class="stat-label">% ?????????</div>
+        <div class="stat-label">% угаданных</div>
         <div class="progress-bar"><div class="progress-fill" style="width:${myPct}%"></div></div>
       </div>
-      <div class="stat-card"><div class="stat-value">${myX2}</div><div class="stat-label">x2 ????????????</div></div>
+      <div class="stat-card"><div class="stat-value">${myX2}</div><div class="stat-label">x2 использовано</div></div>
       <div class="stat-card wide">
         <div class="stat-value">${finished.length} / ${allMatches.length}</div>
-        <div class="stat-label">?????? ???????</div>
+        <div class="stat-label">Матчей сыграно</div>
         <div class="progress-bar"><div class="progress-fill" style="width:${allMatches.length?finished.length/allMatches.length*100:0}%"></div></div>
       </div>
     </div>
-    <div class="section-title">?? ???????</div>
+    <div class="section-title">По игрокам</div>
     <div class="lb-card">
       ${lb.length?lb.map((p,i)=>{
         const max=lb[0]?.points||1;
@@ -536,48 +536,48 @@ async function loadStats(){
           <div class="ps-bar-wrap"><div class="progress-bar" style="margin-top:0"><div class="progress-fill" style="width:${pct}%"></div></div></div>
           <div class="ps-val">${Math.round(p.points*10)/10}</div>
         </div>`;
-      }).join(''):'<div class="empty" style="padding:20px">???? ??? ??????</div>'}
+      }).join(''):'<div class="empty" style="padding:20px">Пока нет данных</div>'}
     </div>`;
   document.getElementById('stats-loader').style.display='none';
   document.getElementById('stats-content').innerHTML=content;
   document.getElementById('stats-content').style.display='block';
 }
 
-// ?? ADMIN ?????????????????????????????????????????????????????????????????????
+// ── ADMIN ─────────────────────────────────────────────────────────────────────
 function renderAdminMatches(){
   const list=document.getElementById('admin-matches-list');
-  if(!matches.length){list.innerHTML='<div class="empty"><div>?????? ???? ???</div></div>';return;}
+  if(!matches.length){list.innerHTML='<div class="empty"><div>Матчей пока нет</div></div>';return;}
   list.innerHTML=matches.map(m=>`
     <div class="admin-card">
-      <div class="admin-match-title">${m.type==='match'?'?':'??'} ${m.title||m.team1+' vs '+m.team2}</div>
-      ${m.result?`<div class="result-set">? ?????????: ${m.result}</div>`:''}
+      <div class="admin-match-title">${m.type==='match'?'⚽':'🌟'} ${m.title||m.team1+' vs '+m.team2}</div>
+      ${m.result?`<div class="result-set">✅ Результат: ${m.result}</div>`:''}
       <div class="admin-result-row" style="margin-top:8px">
         <input class="admin-input" id="res-${m.id}" type="text"
-          placeholder="${m.type==='match'?'????. 2:1':'????????? ???????'}"
+          placeholder="${m.type==='match'?'напр. 2:1':'результат события'}"
           value="${m.result||''}">
-        <button class="admin-btn" onclick="setResult('${m.id}')">?</button>
+        <button class="admin-btn" onclick="setResult('${m.id}')">✓</button>
       </div>
     </div>`).join('');
 }
 
 async function setResult(mid){
   const result=document.getElementById('res-'+mid)?.value.trim();
-  if(!result){showToast('????? ?????????!','error');return;}
+  if(!result){showToast('Введи результат!','error');return;}
   const res=await apiCall({action:'setResult',match_id:mid,result,admin_key:ADMIN_KEY});
   if(res.error){showToast(res.error,'error');}
-  else{showToast('? ????????? ????????, ???? ?????????!','success');await loadAll();}
+  else{showToast('✅ Результат сохранён, очки посчитаны!','success');await loadAll();}
 }
 
 async function importMatches(){
   const apiKey=document.getElementById('api-key-input').value.trim();
-  if(!apiKey){showToast('????? API-????!','error');return;}
-  showToast('? ???????????...','info');
+  if(!apiKey){showToast('Введи API-ключ!','error');return;}
+  showToast('⏳ Импортируем...','info');
   try{
     const res=await fetch('https://api.football-data.org/v4/competitions/WC/matches?season=2026',{
       headers:{'X-Auth-Token':apiKey}
     });
     const data=await res.json();
-    if(!data.matches){showToast('?????? API. ??????? ????.','error');return;}
+    if(!data.matches){showToast('Ошибка API. Проверь ключ.','error');return;}
     let imported=0;
     for(const match of data.matches.slice(0,64)){
       const t1=match.homeTeam.name,t2=match.awayTeam.name;
@@ -585,9 +585,9 @@ async function importMatches(){
       await apiCall({action:'addMatch',title:t1+' vs '+t2,team1:t1,team2:t2,deadline:dl.toISOString(),type:'match'});
       imported++;
     }
-    showToast('? ????????????? '+imported+' ??????!','success');
+    showToast('✅ Импортировано '+imported+' матчей!','success');
     await loadAll();
-  }catch(e){showToast('??????: '+e.message,'error');}
+  }catch(e){showToast('Ошибка: '+e.message,'error');}
 }
 
 function toggleTeamsRow(){
@@ -601,7 +601,7 @@ async function addEvent(){
   const t1=document.getElementById('ev-team1').value.trim();
   const t2=document.getElementById('ev-team2').value.trim();
   const dl=document.getElementById('ev-deadline').value;
-  if(!title||!dl){showToast('??????? ???????? ? ???????!','error');return;}
+  if(!title||!dl){showToast('Заполни название и дедлайн!','error');return;}
   const res=await apiCall({
     action:'addMatch',
     title:type==='match'?t1+' vs '+t2:title,
@@ -610,13 +610,13 @@ async function addEvent(){
   });
   if(res.error){showToast(res.error,'error');}
   else{
-    showToast('? ?????????!','success');
+    showToast('✅ Добавлено!','success');
     ['ev-title','ev-team1','ev-team2','ev-deadline'].forEach(id=>document.getElementById(id).value='');
     await loadAll();
   }
 }
 
-// ?? TABS ??????????????????????????????????????????????????????????????????????
+// ── TABS ──────────────────────────────────────────────────────────────────────
 function switchTab(tab,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
