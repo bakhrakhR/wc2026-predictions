@@ -175,17 +175,6 @@ body{font-family:'Bricolage Grotesque',Arial,sans-serif;background:var(--bg);col
 .stat-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
 .prog{height:5px;background:var(--card2);border-radius:3px;margin-top:8px;overflow:hidden;}
 .prog-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--gold));border-radius:3px;}
-.ps-row{display:flex;align-items:center;padding:9px 14px;gap:10px;border-bottom:1px solid var(--border);}
-.ps-row:last-child{border-bottom:none;}
-.ps-name{flex:1;font-weight:700;font-size:12px;}
-.ps-bar{flex:2;}
-.ps-pts{font-weight:800;font-size:12px;color:var(--gold);min-width:32px;text-align:right;}
-.streak-card{background:linear-gradient(135deg,#2a1008,#3a1e04);border:1.5px solid #f9731640;border-radius:16px;padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;}
-.streak-fires{font-size:26px;letter-spacing:-2px;flex-shrink:0;}
-.streak-info{flex:1;}
-.streak-title{font-size:18px;font-weight:800;color:var(--coral);}
-.streak-sub{font-size:11px;color:var(--muted);margin-top:2px;}
-.share-btn{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:13px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:13px;font-weight:800;color:var(--text);cursor:pointer;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;}
 
 /* ── ADMIN ── */
 .admin-card{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:13px;margin-bottom:8px;}
@@ -238,6 +227,24 @@ select.add-input{cursor:pointer;}
 .reg-input:focus{border-color:var(--gold);}
 .reg-btn{width:100%;background:var(--gold);border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:800;color:#0a0a0a;cursor:pointer;font-family:'Bricolage Grotesque',Arial,sans-serif;}
 
+/* ── ADMIN USERS ── */
+.user-row{background:var(--card);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:6px;border:1.5px solid var(--border);}
+.user-row .u-avatar{width:32px;height:32px;border-radius:50%;background:var(--card2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:var(--muted);flex-shrink:0;}
+.user-row .u-info{flex:1;min-width:0;}
+.user-row .u-name{font-weight:700;font-size:13px;}
+.user-row .u-id{font-size:10px;color:var(--muted);}
+.user-row .u-del{background:transparent;border:1px solid #7b2020;border-radius:8px;padding:5px 8px;font-size:11px;color:var(--red);cursor:pointer;font-family:'Bricolage Grotesque',Arial,sans-serif;}
+/* PREDICTIONS POPUP */
+.pred-popup-bg{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;display:flex;align-items:flex-end;}
+.pred-popup{background:var(--card);border-radius:24px 24px 0 0;padding:20px;width:100%;max-height:80vh;overflow-y:auto;}
+.pred-popup-title{font-size:14px;font-weight:800;color:var(--gold);margin-bottom:12px;}
+.pred-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.pred-row:last-child{border-bottom:none;}
+.pred-row .pr-name{font-weight:700;flex:1;}
+.pred-row .pr-val{color:var(--text);font-weight:700;margin:0 8px;}
+.pred-row .pr-x2{background:var(--red);color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;}
+.pred-row .pr-pts{font-weight:800;min-width:40px;text-align:right;}
+.pred-row .pr-pts.pos{color:var(--green);}.pred-row .pr-pts.neg{color:var(--red);}.pred-row .pr-pts.wait{color:var(--muted);}
 /* ── MISC ── */
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:10px 18px;font-size:12px;font-weight:700;z-index:999;transition:transform 0.3s;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,0.5);}
 .toast.show{transform:translateX(-50%) translateY(0);}
@@ -355,6 +362,8 @@ select.add-input{cursor:pointer;}
       </div>
       <button class="admin-btn" onclick="addEvent()" style="width:100%;margin-top:4px">Добавить событие</button>
     </div>
+    <div class="section-label">👥 Игроки</div>
+    <div id="admin-users" style="margin-bottom:14px"><div class="loader"><div class="spin"></div></div></div>
     <div class="section-label">Результаты</div>
     <div id="admin-list"><div class="loader"><div class="spin"></div></div></div>
   </div>
@@ -623,8 +632,8 @@ async function save(mid,type){
     if(s1===''||s2===''){toast('Введи счёт!','err');return;}prediction=s1+':'+s2;
   } else {prediction=document.getElementById('sp-'+mid)?.value.trim();if(!prediction){toast('Введи ответ!','err');return;}}
   const isX2=document.getElementById('x2-'+mid)?.classList.contains('active')||false;
-  if(isX2){const usedId=getX2UsedMatchId(mid);if(usedId){const um=matches.find(m=>m.id==usedId);toast('x2 уже стоит на '+(um?um.team1+' vs '+um.team2:'другом матче')+' сегодня','err');if(btn){btn.textContent='✓ Сохранить';btn.disabled=false;}return;}}
   const btn=document.getElementById('save-'+mid);if(btn){btn.textContent='...';btn.disabled=true;}
+  if(isX2){const usedId=getX2UsedMatchId(mid);if(usedId){const um=matches.find(m=>m.id==usedId);toast('x2 уже стоит на '+(um?um.team1+' vs '+um.team2:'другом матче')+' сегодня','err');if(btn){btn.textContent='✓ Сохранить';btn.disabled=false;}return;}}
   saving[mid]=true;
   preds[mid]={match_id:parseInt(mid),prediction,is_x2:isX2,points:null};
   renderHistory();
@@ -717,15 +726,14 @@ function renderLB(l){
   } else {
     podEl.innerHTML='';
   }
-  // Список 4+
-  const rest=l.slice(top.length>=2?top.length:0);
-  listEl.innerHTML=rest.map((p,i)=>{
-    const idx=i+(top.length>=2?top.length:0);
+  // Полный список всех игроков
+  listEl.innerHTML=l.map((p,i)=>{
     const isMe=p.user_id===uid;
     const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
     const pts=Math.round(Number(p.points)*10)/10;
+    const medals=['🥇','🥈','🥉'];
     return'<div class="lb-row '+(isMe?'me':'')+'">'+
-      '<div class="lb-rank">'+(idx+1)+'</div>'+
+      '<div class="lb-rank">'+(i<3?medals[i]:i+1)+'</div>'+
       '<div class="lb-avatar">'+ini+'</div>'+
       '<div class="lb-info"><div class="lb-name">'+p.name+(isMe?' 👈':'')+'</div><div class="lb-count">'+(p.prediction_count||0)+' прогнозов</div></div>'+
       '<div class="lb-pts-wrap"><div class="lb-pts">'+(pts>0?'+':'')+pts+'</div></div></div>';
@@ -738,59 +746,52 @@ function calcStreak(){
   let s=0;for(const m of fin){const p=preds[m.id];if(!p||p.points==null)break;if(Number(p.points)>0)s++;else break;}return s;
 }
 
-function buildLBCanvas(){
-  const W=600,ROW=54,H=90+Math.min(lb.length,10)*ROW+36;
-  const c=document.createElement('canvas');c.width=W;c.height=H;
-  const ctx=c.getContext('2d');
-  const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#1a2e1a');bg.addColorStop(1,'#132013');
-  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#f0b429';ctx.font='bold 34px Arial';ctx.fillText('⚽ ЧМ 2026 — Прогнозы',18,46);
-  ctx.fillStyle='#7a9e7a';ctx.font='14px Arial';ctx.fillText(new Date().toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'}),18,68);
-  ctx.strokeStyle='#2d472d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(18,78);ctx.lineTo(W-18,78);ctx.stroke();
-  const medals=['🥇','🥈','🥉'];
-  lb.slice(0,10).forEach((p,i)=>{
-    const y=90+i*ROW,isMe=p.user_id===uid;
-    if(isMe){ctx.fillStyle='rgba(240,180,41,0.1)';ctx.beginPath();ctx.roundRect(8,y+2,W-16,ROW-4,6);ctx.fill();}
-    ctx.font='bold 20px Arial';ctx.fillStyle=i===0?'#f0b429':i===1?'#2dd4bf':i===2?'#f97316':'#7a9e7a';
-    ctx.fillText(i<3?medals[i]:String(i+1),18,y+ROW*0.65);
-    ctx.fillStyle=isMe?'#f0b429':'#f0ebe0';ctx.font=(isMe?'bold ':''  )+'17px Arial';
-    ctx.fillText(p.name+(isMe?' ←':''),i<3?65:55,y+ROW*0.65);
-    ctx.fillStyle='#7a9e7a';ctx.font='11px Arial';ctx.fillText((p.prediction_count||0)+' прогн.',i<3?65:55,y+ROW*0.9);
-    const pts=Math.round(Number(p.points)*10)/10,ptsTxt=(pts>0?'+':'')+pts;
-    ctx.fillStyle='#f0b429';ctx.font='bold 20px Arial';ctx.fillText(ptsTxt,W-18-ctx.measureText(ptsTxt).width,y+ROW*0.65);
-    if(i<Math.min(lb.length,10)-1){ctx.strokeStyle='#2d472d';ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(18,y+ROW);ctx.lineTo(W-18,y+ROW);ctx.stroke();}
-  });
-  ctx.fillStyle='#7a9e7a';ctx.font='12px Arial';ctx.fillText('@'+BOT_USERNAME,18,H-10);
-  return c;
-}
+
 async function loadStats(){
   if(statsLoaded)return;
-  document.getElementById('stats-loader').style.display='block';document.getElementById('stats-content').style.display='none';
-  const lbRes=await sbGet('leaderboard','?select=*');const l=Array.isArray(lbRes)?lbRes:[];
-  const fin=matches.filter(m=>m.result),myP=Object.values(preds);
-  const myFin=myP.filter(p=>matches.find(m=>m.id==p.match_id&&m.result));
+  document.getElementById('stats-loader').style.display='block';
+  document.getElementById('stats-content').style.display='none';
+
+  // Загружаем лидерборд для ранга
+  const lbRes=await sbGet('leaderboard','?select=*');
+  const l=Array.isArray(lbRes)?lbRes:[];
+
+  // Матчи с результатами
+  const fin=matches.filter(m=>m.result);
+  const totalMatches=matches.length;
+
+  // Мои прогнозы (только для существующих матчей)
+  const myP=Object.values(preds);
+  // Мои завершённые прогнозы (матч уже имеет результат)
+  const myFin=myP.filter(p=>{const m=matches.find(m=>m.id==p.match_id);return m&&m.result;});
+  // Угаданные = те где points > 0
   const myOk=myFin.filter(p=>p.points!=null&&Number(p.points)>0).length;
   const myPct=myFin.length?Math.round(myOk/myFin.length*100):0;
-  const myTotal=myP.reduce((s,p)=>s+(Number(p.points)||0),0);
+  // Сумма очков из лидерборда (точнее чем из preds)
+  const meInLB=l.find(r=>r.user_id===uid);
+  const myTotal=meInLB?Math.round(Number(meInLB.points)*10)/10:0;
+  // x2 — только активные прогнозы
   const myX2=myP.filter(p=>p.is_x2).length;
-  const me=l.find(r=>r.user_id===uid);const myRank=me?l.indexOf(me)+1:'-';
-  const streak=calcStreak();const fires='🔥'.repeat(Math.min(streak,7));
+  // Место
+  const myRank=meInLB?l.indexOf(meInLB)+1:'-';
+  // Прогресс матчей
+  const matchPct=totalMatches?Math.round(fin.length/totalMatches*100):0;
+
   document.getElementById('stats-loader').style.display='none';
   document.getElementById('stats-content').innerHTML=
-    (streak>=2?'<div class="streak-card"><div class="streak-fires">'+fires+'</div><div class="streak-info"><div class="streak-title">Серия '+streak+' подряд!</div><div class="streak-sub">'+(streak>=5?'Ты машина!':streak>=3?'Горячая полоса!':'Неплохо!')+'</div></div></div>':'')+
-    
     '<div class="stats-grid">'+
     '<div class="stat-card"><div class="stat-val">'+myRank+'</div><div class="stat-lbl">Моё место</div></div>'+
-    '<div class="stat-card"><div class="stat-val">'+(myTotal>0?'+':'')+Math.round(myTotal*10)/10+'</div><div class="stat-lbl">Мои очки</div></div>'+
-    '<div class="stat-card"><div class="stat-val">'+myPct+'%</div><div class="stat-lbl">% угаданных</div><div class="prog"><div class="prog-fill" style="width:'+myPct+'%"></div></div></div>'+
+    '<div class="stat-card"><div class="stat-val">'+(myTotal>0?'+':'')+myTotal+'</div><div class="stat-lbl">Мои очки</div></div>'+
+    '<div class="stat-card"><div class="stat-val">'+myPct+'%</div><div class="stat-lbl">% угаданных</div>'+
+      '<div class="prog"><div class="prog-fill" style="width:'+myPct+'%"></div></div></div>'+
     '<div class="stat-card"><div class="stat-val">'+myX2+'</div><div class="stat-lbl">x2 ставок</div></div>'+
-    '<div class="stat-card wide"><div class="stat-val">'+fin.length+' / '+matches.length+'</div><div class="stat-lbl">Матчей сыграно</div><div class="prog"><div class="prog-fill" style="width:'+(matches.length?fin.length/matches.length*100:0)+'%"></div></div></div>'+
-    '</div><div class="section-label">По игрокам</div><div style="background:var(--card);border-radius:16px;overflow:hidden">'+
-    (l.length?l.map((p,i)=>{const max=Number(l[0]?.points)||1,pct=Math.max(0,Math.round(Number(p.points)/max*100));
-      return'<div class="ps-row"><div class="lb-rank" style="width:22px;font-size:12px;font-weight:800;color:var(--muted)">'+(i+1)+'</div><div class="ps-name">'+p.name+'</div><div class="ps-bar"><div class="prog" style="margin:0"><div class="prog-fill" style="width:'+pct+'%"></div></div></div><div class="ps-pts">'+Math.round(Number(p.points)*10)/10+'</div></div>';
-    }).join(''):'<div class="empty" style="padding:14px">Пока нет данных</div>')+
+    '<div class="stat-card wide"><div class="stat-val">'+fin.length+' / '+totalMatches+'</div>'+
+      '<div class="stat-lbl">Матчей сыграно</div>'+
+      '<div class="prog"><div class="prog-fill" style="width:'+matchPct+'%"></div></div></div>'+
     '</div>';
-  document.getElementById('stats-content').style.display='block';statsLoaded=true;
+
+  document.getElementById('stats-content').style.display='block';
+  statsLoaded=true;
 }
 
 // ── АДМИН ─────────────────────────────────────────────────────────────────────
@@ -802,6 +803,65 @@ async function loadAdminStats(){
     '<div class="admin-stat"><div class="admin-stat-val">'+pc+'</div><div class="admin-stat-lbl">Прогнозов</div></div>'+
     '<div class="admin-stat"><div class="admin-stat-val">'+uc+'</div><div class="admin-stat-lbl">Игроков</div></div>';
 }
+async function loadAdminUsers(){
+  const el=document.getElementById('admin-users');
+  const[usersRes,predsRes]=await Promise.all([
+    sbGet('users','?select=*&order=created_at'),
+    sbGet('predictions','?select=user_id')
+  ]);
+  const users=Array.isArray(usersRes)?usersRes:[];
+  const predCounts={};
+  (Array.isArray(predsRes)?predsRes:[]).forEach(p=>{predCounts[p.user_id]=(predCounts[p.user_id]||0)+1;});
+  if(!users.length){el.innerHTML='<div class="empty" style="padding:12px">Нет игроков</div>';return;}
+  el.innerHTML=users.map(u=>{
+    const ini=u.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    const cnt=predCounts[u.user_id]||0;
+    const isMe=u.user_id===uid;
+    return'<div class="user-row">'+
+      '<div class="u-avatar">'+ini+'</div>'+
+      '<div class="u-info"><div class="u-name">'+u.name+(isMe?' (я)':'')+'</div><div class="u-id">'+u.user_id+' · '+cnt+' прогнозов</div></div>'+
+      (isMe?'':'<button class="u-del" onclick="deleteUser(\'' +u.user_id+ '\')">✕ Удалить</button>')+
+      '</div>';
+  }).join('');
+}
+
+async function deleteUser(userId){
+  const u=Array.from(document.querySelectorAll('.u-name')).find(el=>el.closest('.user-row')?.querySelector('.u-del')?.onclick?.toString().includes(userId));
+  const userName=u?u.textContent.replace(' (я)',''):'этого игрока';
+  if(!confirm('Удалить игрока "'+userName+'" и все его прогнозы?'))return;
+  // Сначала удаляем прогнозы, потом юзера
+  await sbDelete('predictions','?user_id=eq.'+userId);
+  const res=await sbDelete('users','?user_id=eq.'+userId);
+  if(res?.error)toast('Ошибка: '+res.error,'err');
+  else{toast('✅ Игрок удалён','ok');await loadAll();loadAdminUsers();}
+}
+
+async function showMatchPreds(mid){
+  const m=matches.find(x=>x.id==mid);const title=m?m.title:'Матч '+mid;
+  const res=await sbGet('predictions','?match_id=eq.'+mid+'&select=*,users(name)&order=created_at');
+  if(!Array.isArray(res)||res.error){toast('Ошибка загрузки','err');return;}
+  const rows=res.map(r=>{
+    const pts=r.points!=null?Number(r.points):null;
+    const ptsCls=pts==null?'wait':pts>0?'pos':'neg';
+    const ptsStr=pts==null?'⏳':pts>0?'+'+pts:String(pts);
+    return'<div class="pred-row">'+
+      '<span class="pr-name">'+(r.users?.name||r.user_id)+'</span>'+
+      '<span class="pr-val">'+r.prediction+'</span>'+
+      (r.is_x2?'<span class="pr-x2">×2</span>':'')+
+      '<span class="pr-pts '+ptsCls+'">'+ptsStr+'</span>'+
+      '</div>';
+  }).join('');
+  const bg=document.createElement('div');bg.className='pred-popup-bg';
+  bg.innerHTML='<div class="pred-popup">'+
+    '<div class="pred-popup-title">📋 '+title+'</div>'+
+    (rows||'<div class="empty" style="padding:12px">Нет прогнозов</div>')+
+    '<button class="modal-close" id="close-pp">Закрыть</button>'+
+    '</div>';
+  bg.querySelector('#close-pp').onclick=()=>bg.remove();
+  bg.onclick=e=>{if(e.target===bg)bg.remove();};
+  document.body.appendChild(bg);
+}
+
 function renderAdminList(){
   const el=document.getElementById('admin-list');
   if(!matches.length){el.innerHTML='<div class="empty"><div>Матчей пока нет</div></div>';return;}
@@ -815,6 +875,7 @@ function renderAdminList(){
       '<div class="admin-row" style="margin-top:7px">'+
       '<input class="admin-input" id="res-'+m.id+'" type="text" placeholder="'+(m.type==='match'?'2:1':'результат')+'" value="'+(m.result||'')+'">'+
       '<button class="admin-btn" id="abtn-'+m.id+'" onclick="setResult('+m.id+')">✓</button>'+
+      '<button class="admin-btn grey sm" onclick="showMatchPreds('+m.id+')">👁</button>'+
       '</div></div>';
   }).join('');
 }
@@ -861,7 +922,7 @@ function switchTab(tab,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   if(el)el.classList.add('active');document.getElementById('page-'+tab).classList.add('active');
   if(tab==='lb')loadLB();if(tab==='stats')loadStats();
-  if(tab==='admin'){renderAdminList();loadAdminStats();}
+  if(tab==='admin'){renderAdminList();loadAdminStats();loadAdminUsers();}
 }
 let tt;
 function toast(msg,type='info'){
