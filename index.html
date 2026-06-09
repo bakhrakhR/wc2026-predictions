@@ -879,9 +879,15 @@ function renderAdminList(){
       '</div></div>';
   }).join('');
 }
+// Нормализация счёта: "1 1", "1-1" → "1:1"
+function normalizeScore(s){
+  return s.trim().replace(/[\s\-]+/g,':').replace(/::+/g,':');
+}
+
 async function setResult(mid){
-  const result=document.getElementById('res-'+mid)?.value.trim();
-  if(!result){toast('Введи результат!','err');return;}
+  const raw=document.getElementById('res-'+mid)?.value.trim();
+  if(!raw){toast('Введи результат!','err');return;}
+  const result=normalizeScore(raw);
   const btn=document.getElementById('abtn-'+mid);if(btn){btn.textContent='...';btn.disabled=true;}
   const res=await sbRpc('set_match_result',{p_match_id:parseInt(mid),p_result:result});
   if(btn){btn.textContent='✓';btn.disabled=false;}
