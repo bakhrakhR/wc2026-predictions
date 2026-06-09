@@ -245,6 +245,13 @@ select.add-input{cursor:pointer;}
 .pred-row .pr-x2{background:var(--red);color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;}
 .pred-row .pr-pts{font-weight:800;min-width:40px;text-align:right;}
 .pred-row .pr-pts.pos{color:var(--green);}.pred-row .pr-pts.neg{color:var(--red);}.pred-row .pr-pts.wait{color:var(--muted);}
+/* ── SUB-TABS ── */
+.sub-tabs{display:flex;gap:6px;margin-bottom:10px;}
+.sub-tab{flex:1;padding:10px;background:var(--card);border:none;border-radius:12px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.18s;text-align:center;}
+.sub-tab.active{background:var(--gold);color:#0a0a0a;}
+.time-filter-row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.time-btn{padding:7px 14px;background:var(--card);border:none;border-radius:10px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.15s;flex-shrink:0;}
+.time-btn.active{background:var(--card2);color:var(--text);border:1.5px solid var(--border);}
 /* ── MISC ── */
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:10px 18px;font-size:12px;font-weight:700;z-index:999;transition:transform 0.3s;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,0.5);}
 .toast.show{transform:translateX(-50%) translateY(0);}
@@ -303,10 +310,21 @@ select.add-input{cursor:pointer;}
   </div>
 
   <div class="page active" id="page-pred">
-    <div class="filter-bar" style="margin-top:8px">
-      <div class="filters" id="group-filters"></div>
-      <div class="filter-right" id="open-count"></div>
+    <!-- Подвкладки: Матчи / События -->
+    <div class="sub-tabs" style="margin-top:8px">
+      <button class="sub-tab active" id="subtab-matches" onclick="setSubTab('matches')">⚽ Матчи</button>
+      <button class="sub-tab" id="subtab-events" onclick="setSubTab('events')">⭐ События</button>
     </div>
+
+    <!-- Панель фильтров (только для Матчей) -->
+    <div id="matches-filters">
+      <div class="time-filter-row">
+        <button class="time-btn active" id="tbtn-soon" onclick="setTimeFilter('soon')">Ближайшие</button>
+        <button class="time-btn" id="tbtn-all" onclick="setTimeFilter('all')">Все</button>
+      </div>
+      <div class="filters" id="group-filters"></div>
+    </div>
+
     <div class="loader" id="pred-loader"><div class="spin"></div>Загружаем матчи...</div>
     <div id="matches"></div>
   </div>
@@ -447,7 +465,7 @@ function mkTeamAvatar(name,color){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let tg=window.Telegram?.WebApp;
 let uid,uname,matches=[],preds={},lb=[],matchPreds={};
-let activeGroup='all',showAll=false,saving={},clearing={};
+let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',saving={},clearing={};
 let lbLoaded=false,statsLoaded=false;
 
 // x2 — один матч в день
@@ -509,35 +527,63 @@ function openRules(){document.getElementById('rules-modal').style.display='flex'
 function closeRules(){document.getElementById('rules-modal').style.display='none';}
 
 // ── FILTERS ───────────────────────────────────────────────────────────────────
+// ── ПОДВКЛАДКИ ──────────────────────────────────────────────────────────────
+function setSubTab(tab){
+  activeSubTab=tab;activeGroup='all';
+  document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('subtab-'+tab)?.classList.add('active');
+  document.getElementById('matches-filters').style.display=tab==='matches'?'block':'none';
+  buildFilters();renderMatches();
+}
+function setTimeFilter(tf){
+  activeTimeFilter=tf;
+  document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tbtn-'+tf)?.classList.add('active');
+  renderMatches();
+}
 function buildFilters(){
-  const now=new Date(),open=matches.filter(m=>!m.result&&now<=new Date(m.deadline));
-  const groups=new Set();open.forEach(m=>{const g=getGroup(m);if(g)groups.add(g);});
+  if(activeSubTab!=='matches')return;
+  const now=new Date();
+  const openMatches=matches.filter(m=>m.type==='match'&&!m.result);
+  const groups=new Set();
+  openMatches.forEach(m=>{const g=getGroup(m);if(g)groups.add(g);});
   const el=document.getElementById('group-filters');
-  const btns=[{key:'all',label:'Все'},{key:'special',label:'⭐ Особые'}];
-  [...groups].sort().forEach(g=>btns.push({key:g,label:'Группа '+g}));
-  el.innerHTML=btns.map(b=>'<button class="filter-btn '+(activeGroup===b.key?'active':'')+'\" onclick="setFilter(\''+b.key+'\')">'+b.label+'</button>').join('');
-  const openCount=open.filter(m=>m.type==='match').length;
-  document.getElementById('open-count').textContent=openCount?openCount+' матчей':'';
+  const btns=[{key:'all',label:'Все группы'}];
+  [...groups].sort().forEach(g=>btns.push({key:g,label:'Гр. '+g}));
+  // Показываем фильтр только если есть хотя бы одна группа
+  const filtersEl=document.getElementById('group-filters');
+  if(groups.size===0){filtersEl.innerHTML='';return;}
+  filtersEl.innerHTML=btns.map(b=>'<button class="filter-btn '+(activeGroup===b.key?'active':'')+'" onclick="setFilter(\'' +b.key+ '\')">'+b.label+'</button>').join('');
+  // count removed
 }
 function setFilter(g){activeGroup=g;buildFilters();renderMatches();}
 function getVisible(){
-  const now=new Date();let open=matches.filter(m=>!m.result);
-  if(activeGroup==='special')open=open.filter(m=>m.type==='special');
-  else if(activeGroup!=='all')open=open.filter(m=>m.type==='special'||getGroup(m)===activeGroup);
-  const sp=open.filter(m=>m.type==='special').sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-  const up=open.filter(m=>m.type==='match'&&now<=new Date(m.deadline)).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-  const cl=open.filter(m=>m.type==='match'&&now>new Date(m.deadline)).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
-  return[...sp,...up,...cl];
+  const now=new Date(),threeDays=new Date(now.getTime()+3*24*3600*1000);
+  if(activeSubTab==='events'){
+    return matches.filter(m=>m.type==='special'&&!m.result)
+      .sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+  }
+  // Матчи
+  let pool=matches.filter(m=>m.type==='match'&&!m.result);
+  if(activeGroup!=='all')pool=pool.filter(m=>getGroup(m)===activeGroup);
+  if(activeTimeFilter==='soon')pool=pool.filter(m=>new Date(m.deadline)<=threeDays);
+  const upcoming=pool.filter(m=>now<=new Date(m.deadline)).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+  const closed=pool.filter(m=>now>new Date(m.deadline)).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
+  return[...upcoming,...closed];
 }
 
 // ── MATCH CARDS ───────────────────────────────────────────────────────────────
 function renderMatches(){
   document.getElementById('pred-loader').style.display='none';
   const el=document.getElementById('matches'),vis=getVisible();
-  const now=new Date(),n=matches.filter(m=>!m.result&&now<=new Date(m.deadline)&&!preds[m.id]).length;
+  const now=new Date(),n=matches.filter(m=>m.type==='match'&&!m.result&&now<=new Date(m.deadline)&&!preds[m.id]).length;
   const b=document.getElementById('badge-pred');
   if(n>0){b.textContent=n;b.style.display='flex';}else b.style.display='none';
-  if(!vis.length){el.innerHTML='<div class="empty"><div class="empty-ic">📅</div><div>Нет активных матчей</div></div>';return;}
+  if(!vis.length){
+    const msg=activeSubTab==='events'?'Нет активных событий':
+      activeTimeFilter==='soon'?'Нет матчей в ближайшие 3 дня — переключи на «Все»':'Нет активных матчей';
+    el.innerHTML='<div class="empty"><div class="empty-ic">📅</div><div>'+msg+'</div></div>';return;
+  }
   el.innerHTML=vis.map(buildCard).join('');
 }
 
@@ -599,7 +645,7 @@ function buildCard(m){
     (p?'<button class="clear-btn" onclick="clearPred(\''+m.id+'\')">✕</button>':'')+
     '<button class="save-btn" id="save-'+m.id+'" onclick="save(\''+m.id+'\',\''+m.type+'\')">✓ Сохранить</button>'+
     '</div>':'';
-  const headerLabel=m.type==='match'?(grp?'Группа '+grp:'⚽'):'🌟 Событие';
+  const headerLabel=m.type==='match'?(grp?'Группа '+grp:'⚽ Матч'):'🌟 Особое событие';
   return'<div class="match-card '+(p?'has-pred':'')+' '+(locked?'locked':'')+' '+(m.type==='special'?'special-card':'')+'\" id="card-'+m.id+'">'+
     '<div class="match-header"><div class="match-group">'+headerLabel+'</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
     body+resHtml+predInfo+othersHtml+bottom+'</div>';
