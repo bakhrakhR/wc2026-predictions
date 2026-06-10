@@ -471,13 +471,16 @@ let lbLoaded=false,statsLoaded=false;
 // x2 — один матч в день
 function matchDay(deadline){return new Date(deadline).toLocaleDateString('en',{timeZone:'Asia/Jerusalem'});}
 function getX2UsedMatchId(forMatchId){
-  // Возвращает match_id где уже стоит x2 в тот же день (или null)
+  // Для особых событий — без ограничений
   const m=matches.find(m=>m.id==forMatchId);if(!m)return null;
+  if(m.type==='special')return null;
+  // Для матчей — один x2 в день (проверяем только среди матчей, не событий)
   const day=matchDay(m.deadline);
   for(const[mid,p] of Object.entries(preds)){
     if(mid==forMatchId)continue;
     if(!p.is_x2)continue;
     const om=matches.find(m=>m.id==mid);if(!om)continue;
+    if(om.type==='special')continue; // события не считаем
     if(matchDay(om.deadline)===day)return parseInt(mid);
   }
   return null;
@@ -641,7 +644,7 @@ function buildCard(m){
     }
   } else if(locked&&matchPreds[m.id]===undefined)loadMatchPreds(m.id);
   const bottom=!locked?'<div class="card-bottom">'+
-    '<button class="x2-btn '+(isX2?'active':getX2UsedMatchId(m.id)&&!isX2?'used':'')+'\" id="x2-'+m.id+'" onclick="toggleX2(\''+m.id+'\')">🎲 ×2</button>'+
+    '<button class="x2-btn '+(isX2?'active':m.type!=='special'&&getX2UsedMatchId(m.id)&&!isX2?'used':'')+'\" id="x2-'+m.id+'" onclick="toggleX2(\''+m.id+'\')">🎲 ×2</button>'+
     (p?'<button class="clear-btn" onclick="clearPred(\''+m.id+'\')">✕</button>':'')+
     '<button class="save-btn" id="save-'+m.id+'" onclick="save(\''+m.id+'\',\''+m.type+'\')">✓ Сохранить</button>'+
     '</div>':'';
@@ -665,7 +668,7 @@ function toggleX2(mid){
   const isActive=btn.classList.contains('active');
   if(!isActive){// trying to activate
     const usedId=getX2UsedMatchId(mid);
-    if(usedId){const um=matches.find(m=>m.id==usedId);toast('x2 уже стоит на '+(um?um.team1+' vs '+um.team2:'другом матче')+' сегодня','err');return;}
+    if(usedId){const um=matches.find(m=>m.id==usedId);toast('x2 уже использован '+(um?'на '+um.team1+' vs '+um.team2:'на другом матче')+' в этот день','err');return;}
   }
   btn.classList.toggle('active');
 }
@@ -679,7 +682,7 @@ async function save(mid,type){
   } else {prediction=document.getElementById('sp-'+mid)?.value.trim();if(!prediction){toast('Введи ответ!','err');return;}}
   const isX2=document.getElementById('x2-'+mid)?.classList.contains('active')||false;
   const btn=document.getElementById('save-'+mid);if(btn){btn.textContent='...';btn.disabled=true;}
-  if(isX2){const usedId=getX2UsedMatchId(mid);if(usedId){const um=matches.find(m=>m.id==usedId);toast('x2 уже стоит на '+(um?um.team1+' vs '+um.team2:'другом матче')+' сегодня','err');if(btn){btn.textContent='✓ Сохранить';btn.disabled=false;}return;}}
+  if(isX2){const usedId=getX2UsedMatchId(mid);if(usedId){const um=matches.find(m=>m.id==usedId);toast('x2 уже использован '+(um?'на '+um.team1+' vs '+um.team2:'на другом матче')+' в этот день','err');if(btn){btn.textContent='✓ Сохранить';btn.disabled=false;}return;}}
   saving[mid]=true;
   preds[mid]={match_id:parseInt(mid),prediction,is_x2:isX2,points:null};
   renderHistory();
