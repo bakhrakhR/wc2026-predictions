@@ -227,6 +227,10 @@ select.add-input{cursor:pointer;}
 .reg-input:focus{border-color:var(--gold);}
 .reg-btn{width:100%;background:var(--gold);border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:800;color:#0a0a0a;cursor:pointer;font-family:'Bricolage Grotesque',Arial,sans-serif;}
 
+/* ── EDIT DEADLINE ── */
+.edit-dl-row{display:flex;gap:6px;align-items:center;margin-top:7px;}
+.edit-dl-input{flex:1;background:#1a2e1a;border:1.5px solid var(--gold);border-radius:10px;padding:8px 10px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:12px;font-weight:700;color:var(--text);outline:none;}
+.dl-badge{font-size:10px;color:var(--muted);margin-top:3px;}
 /* ── ADMIN USERS ── */
 .user-row{background:var(--card);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:6px;border:1.5px solid var(--border);}
 .user-row .u-avatar{width:32px;height:32px;border-radius:50%;background:var(--card2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:var(--muted);flex-shrink:0;}
@@ -917,11 +921,19 @@ function renderAdminList(){
   const sorted=[...matches.filter(m=>m.type==='special'),...matches.filter(m=>m.type!=='special')];
   el.innerHTML=sorted.map(m=>{
     const pts=m.custom_points?'(+'+m.custom_points+' pts)':'';
+    const dlStr=m.deadline?fmtTime(m.deadline):'?';
+    // Конвертируем deadline в формат для datetime-local input
+    const dlLocal=m.deadline?new Date(new Date(m.deadline).getTime()).toISOString().slice(0,16):'';
     return'<div class="admin-card" id="acard-'+m.id+'">'+
       '<div class="admin-title"><span>'+(m.type==='match'?'⚽':'🌟')+' '+(m.title||m.team1+' vs '+m.team2)+' '+pts+'</span>'+
       '<button class="del-btn" onclick="deleteMatch('+m.id+')">🗑️</button></div>'+
+      '<div class="dl-badge">🕐 Дедлайн: '+dlStr+'</div>'+
       (m.result?'<div class="res-set">✅ '+m.result+' <button class="admin-btn grey sm" onclick="clearRes('+m.id+')">↺</button></div>':'')+
-      '<div class="admin-row" style="margin-top:7px">'+
+      '<div class="edit-dl-row">'+
+      '<input class="edit-dl-input" id="dl-'+m.id+'" type="datetime-local" value="'+dlLocal+'">'+
+      '<button class="admin-btn grey sm" onclick="updateDeadline('+m.id+')">🕐</button>'+
+      '</div>'+
+      '<div class="admin-row" style="margin-top:6px">'+
       '<input class="admin-input" id="res-'+m.id+'" type="text" placeholder="'+(m.type==='match'?'2:1':'результат')+'" value="'+(m.result||'')+'">'+
       '<button class="admin-btn" id="abtn-'+m.id+'" onclick="setResult('+m.id+')">✓</button>'+
       '<button class="admin-btn grey sm" onclick="showMatchPreds('+m.id+')">👁</button>'+
@@ -943,6 +955,28 @@ async function setResult(mid){
   if(res?.error)toast(res.error,'err');else{toast('✅ ('+res.counted+' прогнозов)','ok');await loadAll();}
 }
 async function clearRes(mid){if(!confirm('Сбросить?'))return;const res=await sbRpc('clear_match_result',{p_match_id:parseInt(mid)});if(res?.error)toast(res.error,'err');else{toast('↺ Сброшено','ok');await loadAll();}}
+async function updateDeadline(mid){
+  const input=document.getElementById('dl-'+mid);
+  if(!input||!input.value){toast('Выбери дату!','err');return;}
+  // Берём значение как локальное время (datetime-local всегда возвращает локальное)
+  const newDeadline=new Date(input.value).toISOString();
+  const btn=input.nextElementSibling;
+  if(btn){btn.textContent='...';btn.disabled=true;}
+  const res=await fetch(SB_URL+'/rest/v1/matches?id=eq.'+mid,{
+    method:'PATCH',
+    headers:{...SB_HEADERS,'Prefer':'return=minimal'},
+    body:JSON.stringify({deadline:newDeadline})
+  });
+  if(btn){btn.textContent='🕐';btn.disabled=false;}
+  if(!res.ok){toast('Ошибка сохранения','err');return;}
+  // Обновляем локально без сброса прогнозов
+  const m=matches.find(m=>m.id==mid);
+  if(m)m.deadline=newDeadline;
+  toast('✅ Дедлайн обновлён','ok');
+  renderAdminList(); // перерисовываем карточку
+  renderMatches();   // обновляем карточки прогнозов
+}
+
 async function deleteMatch(mid){if(!confirm('Удалить?'))return;const res=await sbDelete('matches','?id=eq.'+mid);if(res?.error)toast('Ошибка','err');else{toast('🗑️ Удалено','ok');matches=matches.filter(m=>m.id!=mid);renderAdminList();renderMatches();}}
 async function clearAllPreds(){if(!confirm('Удалить ВСЕ прогнозы?'))return;const res=await sbRpc('clear_all_predictions',{});if(res?.error)toast(res.error,'err');else{toast('✅ Очищено','ok');await loadAll();}}
 async function clearMyPreds(){if(!confirm('Удалить мои прогнозы?'))return;const res=await sbRpc('clear_all_predictions',{p_user_id:uid});if(res?.error)toast(res.error,'err');else{toast('✅ Очищено','ok');await loadAll();}}
