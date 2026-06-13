@@ -731,12 +731,49 @@ function renderHistory(){
     html+='<div class="section-label" style="margin-top:'+(pending.length?'14px':'4px')+'">Сыгранные</div>';
     html+=fin.map(m=>{
       const p=preds[m.id],pts=p?Number(p.points):null;
-      const ph=p&&p.points!=null?'<div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'\">'+(pts>0?'+':'')+pts+' pts</div>':'<div class="pts wait">—</div>';
-      return'<div class="hist-card"><div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' — '+m.team2:m.title)+'</div><div class="hist-res">'+m.result+'</div></div>'+
-        '<div class="hist-pred-row"><div class="hist-pred-val">'+(p?'Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':''):'<span style="color:var(--muted)">Не сделан</span>')+'</div>'+ph+'</div></div>';
+      const ph=p&&p.points!=null?'<div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'">'+(pts>0?'+':'')+pts+' pts</div>':'<div class="pts wait">—</div>';
+      // Прогнозы других участников (из matchPreds если загружены)
+      let othersHtml='';
+      if(matchPreds[m.id]){
+        const others=matchPreds[m.id].filter(r=>r.user_id!==uid);
+        if(others.length){
+          othersHtml='<div class="others-preds" style="border-top:1px solid var(--border);padding:7px 14px">'+
+            '<div class="others-title">👥 Ставки участников</div>'+
+            '<div class="others-list">'+
+            others.map(r=>{
+              const rpts=r.points!=null?Number(r.points):null;
+              const rph=rpts!=null?'<span class="opts '+(rpts>0?'pos':'neg')+'">'+(rpts>0?'+':'')+rpts+'</span>':'';
+              return'<div class="other-chip '+(r.is_x2?'ox2':'')+'"><span class="oname">'+r.name+':</span><span>'+r.prediction+'</span>'+(r.is_x2?'<span class="x2-tag">x2</span>':'')+rph+'</div>';
+            }).join('')+
+            '</div></div>';
+        }
+      } else if(matchPreds[m.id]===undefined){
+        // Загружаем ставки для этого матча
+        loadHistMatchPreds(m.id);
+      }
+      return'<div class="hist-card" id="hcard-'+m.id+'">'+
+        '<div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' — '+m.team2:m.title)+'</div><div class="hist-res">'+m.result+'</div></div>'+
+        '<div class="hist-pred-row"><div class="hist-pred-val">'+(p?'Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':''):'<span style="color:var(--muted)">Не сделан</span>')+'</div>'+ph+'</div>'+
+        othersHtml+
+        '</div>';
     }).join('');
   }
   el.innerHTML=html;
+}
+
+// ── Загрузка ставок для истории ─────────────────────────────────────────────
+async function loadHistMatchPreds(mid){
+  matchPreds[mid]=null; // помечаем что загружаем
+  const res=await sbGet('predictions','?match_id=eq.'+mid+'&select=*,users(name)');
+  if(Array.isArray(res)){
+    matchPreds[mid]=res.map(r=>({...r,name:r.users?.name||'Игрок'}));
+    // Перерисовываем только если вкладка История открыта
+    const card=document.getElementById('hcard-'+mid);
+    if(card){
+      const m=matches.find(m=>m.id==mid);
+      if(m) renderHistory(); // простой ре-рендер, данные уже в matchPreds
+    }
+  }
 }
 
 // ── ЛИДЕРБОРД (с подиумом) ────────────────────────────────────────────────────
@@ -918,7 +955,14 @@ async function showMatchPreds(mid){
 function renderAdminList(){
   const el=document.getElementById('admin-list');
   if(!matches.length){el.innerHTML='<div class="empty"><div>Матчей пока нет</div></div>';return;}
-  const sorted=[...matches.filter(m=>m.type==='special'),...matches.filter(m=>m.type!=='special')];
+  // Сортировка: сначала события без результата, потом матчи без результата, в конце — рассчитанные
+  const withoutResult=matches.filter(m=>!m.result);
+  const withResult=matches.filter(m=>m.result);
+  const sorted=[
+    ...withoutResult.filter(m=>m.type==='special').sort((a,b)=>new Date(a.deadline)-new Date(b.deadline)),
+    ...withoutResult.filter(m=>m.type!=='special').sort((a,b)=>new Date(a.deadline)-new Date(b.deadline)),
+    ...withResult.sort((a,b)=>new Date(b.deadline)-new Date(a.deadline))
+  ];
   el.innerHTML=sorted.map(m=>{
     const pts=m.custom_points?'(+'+m.custom_points+' pts)':'';
     const dlStr=m.deadline?fmtTime(m.deadline):'?';
