@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ЧМ 2026 Прогнозы</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -385,6 +384,15 @@ select.add-input{cursor:pointer;}
       <button class="admin-btn" onclick="addEvent()" style="width:100%;margin-top:4px">Добавить событие</button>
     </div>
     <div class="section-label">👥 Игроки</div>
+    <div class="add-box">
+      <div class="add-title">🔀 Слить дублирующиеся аккаунты</div>
+      <div class="import-sub" style="margin-bottom:8px">Если у игрока появился временный профиль (test_XXXX) — перенеси его прогнозы на основной ID и удали дубль</div>
+      <div class="add-row">
+        <input class="add-input" id="merge-from" type="text" placeholder="Откуда (напр. test_6585)">
+        <input class="add-input" id="merge-to" type="text" placeholder="Куда (напр. 786072422)">
+      </div>
+      <button class="admin-btn" onclick="mergeUsers()" style="width:100%">Слить аккаунты</button>
+    </div>
     <div id="admin-users" style="margin-bottom:14px"><div class="loader"><div class="spin"></div></div></div>
     <div class="section-label">Результаты</div>
     <div id="admin-list"><div class="loader"><div class="spin"></div></div></div>
@@ -467,7 +475,7 @@ function mkTeamAvatar(name,color){
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let tg=window.Telegram?.WebApp;
+let tg; // будет установлен после загрузки telegram-web-app.js (см. initTelegram)
 let uid,uname,matches=[],preds={},lb=[],matchPreds={};
 let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',saving={},clearing={};
 let lbLoaded=false,statsLoaded=false;
@@ -491,15 +499,63 @@ function getX2UsedMatchId(forMatchId){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-window.addEventListener('load',async()=>{
-  if(tg){tg.ready();tg.expand();tg.setHeaderColor('#132013');tg.setBackgroundColor('#132013');
-    const u=tg.initDataUnsafe?.user;
-    if(u){uid=u.id.toString();uname=u.first_name+(u.last_name?' '+u.last_name:'');}
+let realTelegramId=false; // помечаем, удалось ли получить настоящий Telegram ID
+
+// Загружаем скрипт Telegram динамически с несколькими попытками —
+// частая причина сбоя это временные сетевые проблемы (VPN, нестабильное соединение),
+// а не постоянная блокировка. Несколько попыток с паузой решают это в большинстве случаев.
+function loadTelegramScript(attempt){
+  return new Promise((resolve)=>{
+    const s=document.createElement('script');
+    s.src='https://telegram.org/js/telegram-web-app.js?v='+Date.now(); // cache-bust на случай частичной/битой загрузки
+    s.onload=()=>resolve(true);
+    s.onerror=()=>resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
+async function initTelegram(){
+  const maxAttempts=4;
+  for(let i=1;i<=maxAttempts;i++){
+    const ok=await loadTelegramScript(i);
+    if(ok && window.Telegram?.WebApp?.initDataUnsafe?.user){
+      return true; // скрипт загрузился и сразу есть данные пользователя
+    }
+    if(ok && window.Telegram?.WebApp){
+      // скрипт загрузился, но initDataUnsafe пуст — даём чуть времени Telegram прислать данные
+      await new Promise(r=>setTimeout(r,400));
+      if(window.Telegram?.WebApp?.initDataUnsafe?.user)return true;
+    }
+    if(i<maxAttempts)await new Promise(r=>setTimeout(r,600*i)); // увеличивающаяся пауза между попытками
   }
-  if(!uid)uid='test_'+Math.floor(Math.random()*9000+1000);
+  return false;
+}
+
+window.addEventListener('load',async()=>{
+  const success=await initTelegram();
+  tg=window.Telegram?.WebApp;
+  if(success && tg){
+    tg.ready();tg.expand();tg.setHeaderColor('#132013');tg.setBackgroundColor('#132013');
+    const u=tg.initDataUnsafe?.user;
+    if(u){uid=u.id.toString();uname=u.first_name+(u.last_name?' '+u.last_name:'');realTelegramId=true;}
+  }
+  if(!uid){
+    // Все попытки исчерпаны — используем временный ID, но явно предупреждаем об этом
+    uid='test_'+Math.floor(Math.random()*9000+1000);
+    showConnectionWarning();
+  }
   if(ADMIN_IDS.includes(uid))document.getElementById('admin-tab').style.display='block';
   await checkReg();
 });
+
+function showConnectionWarning(){
+  const w=document.createElement('div');
+  w.style.cssText='position:fixed;top:0;left:0;right:0;background:#7a1f1f;color:#fff;font-size:12px;font-weight:700;padding:10px 14px;z-index:500;text-align:center;line-height:1.4;';
+  w.innerHTML='⚠️ Не удалось получить твой Telegram ID (проблема с соединением). '+
+    'Сейчас открыт временный профиль <b>'+uid+'</b> — твои старые прогнозы не подключатся. '+
+    'Попробуй перезайти ещё раз или открыть без VPN.';
+  document.body.prepend(w);
+}
 
 async function checkReg(){
   const s=localStorage.getItem('wc26_'+uid);
@@ -515,7 +571,12 @@ async function doReg(name){
   uname=name;localStorage.setItem('wc26_'+uid,JSON.stringify({name}));
   await fetch(SB_URL+'/rest/v1/users?on_conflict=user_id',{method:'POST',headers:{...SB_HEADERS,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:uid,name})});
 }
-function showApp(){document.getElementById('app').style.display='block';loadAll();}
+function showApp(){
+  document.getElementById('app').style.display='block';loadAll();
+  // Показываем свой ID долгим тапом по логотипу — для диагностики проблем
+  const logo=document.querySelector('.logo');
+  if(logo)logo.addEventListener('click',()=>{toast('ID: '+uid+(realTelegramId?' (telegram)':' (временный!)'),realTelegramId?'info':'err');},{passive:true});
+}
 
 async function loadAll(){
   const[matchRes,predRes,lbRes]=await Promise.all([sbGet('matches','?select=*&order=id'),sbGet('predictions','?user_id=eq.'+uid+'&select=*'),sbGet('leaderboard','?select=*')]);
@@ -913,6 +974,46 @@ async function loadAdminUsers(){
       (isMe?'':'<button class="u-del" onclick="deleteUser(\'' +u.user_id+ '\')">✕ Удалить</button>')+
       '</div>';
   }).join('');
+}
+
+async function mergeUsers(){
+  const fromId=document.getElementById('merge-from').value.trim();
+  const toId=document.getElementById('merge-to').value.trim();
+  if(!fromId||!toId){toast('Заполни оба ID!','err');return;}
+  if(fromId===toId){toast('ID должны отличаться!','err');return;}
+  if(!confirm('Перенести все прогнозы с '+fromId+' на '+toId+' и удалить '+fromId+'?'))return;
+
+  // 1. Получаем прогнозы обоих аккаунтов
+  const[fromPreds,toPreds]=await Promise.all([
+    sbGet('predictions','?user_id=eq.'+fromId+'&select=*'),
+    sbGet('predictions','?user_id=eq.'+toId+'&select=match_id')
+  ]);
+  if(!Array.isArray(fromPreds)){toast('Ошибка чтения данных','err');return;}
+  const toMatchIds=new Set((Array.isArray(toPreds)?toPreds:[]).map(p=>p.match_id));
+
+  let moved=0,skipped=0;
+  for(const p of fromPreds){
+    if(toMatchIds.has(p.match_id)){
+      // У целевого аккаунта уже есть прогноз на этот матч — не перезаписываем, просто удаляем дубль
+      await sbDelete('predictions','?id=eq.'+p.id);
+      skipped++;
+    } else {
+      // Переносим прогноз на целевой аккаунт
+      const res=await fetch(SB_URL+'/rest/v1/predictions?id=eq.'+p.id,{
+        method:'PATCH',headers:{...SB_HEADERS,'Prefer':'return=minimal'},
+        body:JSON.stringify({user_id:toId})
+      });
+      if(res.ok)moved++;
+    }
+  }
+
+  // 2. Удаляем старого пользователя (если он есть в users)
+  await sbDelete('users','?user_id=eq.'+fromId);
+
+  toast('✅ Перенесено '+moved+', пропущено (дубли) '+skipped,'ok');
+  document.getElementById('merge-from').value='';
+  document.getElementById('merge-to').value='';
+  await loadAll();loadAdminUsers();
 }
 
 async function deleteUser(userId){
