@@ -53,6 +53,8 @@ body{font-family:'Bricolage Grotesque',Arial,sans-serif;background:var(--bg);col
 .match-card{background:var(--card);border-radius:var(--r);margin-bottom:10px;overflow:hidden;border:1.5px solid transparent;}
 .match-card.has-pred{border-color:var(--border);}
 .match-card.locked{opacity:0.85;}
+.match-card.is-live{opacity:1;border-color:#ef4444aa;box-shadow:0 0 0 1px #ef444433;animation:livepulse 2s ease-in-out infinite;}
+@keyframes livepulse{0%,100%{box-shadow:0 0 0 1px #ef444433;}50%{box-shadow:0 0 0 1px #ef444466;}}
 .match-card.special-card{border-color:#4c1d9544;}
 .match-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 0;}
 .match-group{font-size:12px;font-weight:700;color:var(--gold);display:flex;align-items:center;gap:6px;}
@@ -60,6 +62,7 @@ body{font-family:'Bricolage Grotesque',Arial,sans-serif;background:var(--bg);col
 .match-time{font-size:12px;color:var(--muted);font-weight:600;}
 .match-time.soon{color:var(--coral);}
 .match-time.past{color:var(--red);}
+.match-time.live{color:#ef4444;font-weight:800;}
 
 /* ── TEAM LAYOUT ── */
 .score-row{display:flex;align-items:flex-end;justify-content:center;padding:14px 12px 4px;gap:8px;}
@@ -459,7 +462,11 @@ async function sbRpc(fn,body){
 function fmtTime(d){return new Date(d).toLocaleString('ru',{timeZone:'Asia/Jerusalem',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
 function fmtDL(d){
   const dl=new Date(d),now=new Date(),diff=dl-now,h=diff/3600000;
-  if(now>dl)return{text:'🔒 Закрыт',cls:'past'};
+  if(now>dl){
+    const sinceMin=(now-dl)/60000;
+    if(sinceMin<=150)return{text:'🔴 Идёт сейчас',cls:'live'}; // ~2.5ч после дедлайна
+    return{text:'🔒 Закрыт',cls:'past'};
+  }
   if(h<1)return{text:'⏳ '+Math.ceil(diff/60000)+' мин',cls:'soon'};
   if(h<24)return{text:'⏰ '+Math.floor(h)+' ч',cls:'soon'};
   return{text:fmtTime(d),cls:''};
@@ -675,6 +682,8 @@ function buildFilters(){
 function setFilter(g){activeGroup=g;buildFilters();renderMatches();}
 function getVisible(){
   const now=new Date(),threeDays=new Date(now.getTime()+3*24*3600*1000);
+  // Матч считается "идущим сейчас" примерно 2.5 часа после дедлайна (с запасом на овертайм/пенальти)
+  const liveWindow=2.5*3600*1000;
   if(activeSubTab==='events'){
     return matches.filter(m=>m.type==='special'&&!m.result)
       .sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
@@ -683,9 +692,14 @@ function getVisible(){
   let pool=matches.filter(m=>m.type==='match'&&!m.result);
   if(activeGroup!=='all')pool=pool.filter(m=>getGroup(m)===activeGroup);
   if(activeTimeFilter==='soon')pool=pool.filter(m=>new Date(m.deadline)<=threeDays);
+
+  // live — дедлайн уже прошёл, но недавно (матч сейчас идёт) — поднимаем наверх
+  const live=pool.filter(m=>{const diff=now-new Date(m.deadline);return diff>0&&diff<=liveWindow;})
+    .sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
   const upcoming=pool.filter(m=>now<=new Date(m.deadline)).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-  const closed=pool.filter(m=>now>new Date(m.deadline)).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
-  return[...upcoming,...closed];
+  const closed=pool.filter(m=>{const diff=now-new Date(m.deadline);return diff>liveWindow;}).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
+
+  return[...live,...upcoming,...closed];
 }
 
 // ── MATCH CARDS ───────────────────────────────────────────────────────────────
@@ -762,7 +776,7 @@ function buildCard(m){
     '<button class="save-btn" id="save-'+m.id+'" onclick="save(\''+m.id+'\',\''+m.type+'\')">✓ Сохранить</button>'+
     '</div>':'';
   const headerLabel=m.type==='match'?(grp?'Группа '+grp:'⚽ Матч'):'🌟 Особое событие';
-  return'<div class="match-card '+(p?'has-pred':'')+' '+(locked?'locked':'')+' '+(m.type==='special'?'special-card':'')+'\" id="card-'+m.id+'">'+
+  return'<div class="match-card '+(p?'has-pred':'')+' '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+' '+(m.type==='special'?'special-card':'')+'\" id="card-'+m.id+'">'+
     '<div class="match-header"><div class="match-group">'+headerLabel+'</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
     body+resHtml+predInfo+othersHtml+bottom+'</div>';
 }
