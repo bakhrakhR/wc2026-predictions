@@ -336,6 +336,14 @@ select.add-input{cursor:pointer;}
       <div class="filters" id="group-filters"></div>
     </div>
 
+    <!-- Панель фильтров (только для Событий) -->
+    <div id="events-filters" style="display:none">
+      <div class="time-filter-row">
+        <button class="time-btn active" id="ebtn-open" onclick="setEventFilter('open')">🟢 Открытые</button>
+        <button class="time-btn" id="ebtn-closed" onclick="setEventFilter('closed')">🔒 Закрытые</button>
+      </div>
+    </div>
+
     <div class="loader" id="pred-loader"><div class="spin"></div>Загружаем матчи...</div>
     <div id="matches"></div>
   </div>
@@ -510,7 +518,7 @@ function mkTeamAvatar(name,color){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let tg; // будет установлен после загрузки telegram-web-app.js (см. initTelegram)
 let uid,uname,matches=[],preds={},lb=[],matchPreds={};
-let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',saving={},clearing={};
+let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',saving={},clearing={};
 let lbLoaded=false,statsLoaded=false;
 
 // x2 — один матч в день
@@ -656,11 +664,18 @@ function setSubTab(tab){
   document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active'));
   document.getElementById('subtab-'+tab)?.classList.add('active');
   document.getElementById('matches-filters').style.display=tab==='matches'?'block':'none';
+  document.getElementById('events-filters').style.display=tab==='events'?'block':'none';
   buildFilters();renderMatches();
+}
+function setEventFilter(ef){
+  activeEventFilter=ef;
+  document.querySelectorAll('#events-filters .time-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ebtn-'+ef)?.classList.add('active');
+  renderMatches();
 }
 function setTimeFilter(tf){
   activeTimeFilter=tf;
-  document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#matches-filters .time-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tbtn-'+tf)?.classList.add('active');
   renderMatches();
 }
@@ -673,32 +688,31 @@ function buildFilters(){
   const el=document.getElementById('group-filters');
   const btns=[{key:'all',label:'Все группы'}];
   [...groups].sort().forEach(g=>btns.push({key:g,label:'Гр. '+g}));
-  // Показываем фильтр только если есть хотя бы одна группа
   const filtersEl=document.getElementById('group-filters');
   if(groups.size===0){filtersEl.innerHTML='';return;}
-  filtersEl.innerHTML=btns.map(b=>'<button class="filter-btn '+(activeGroup===b.key?'active':'')+'" onclick="setFilter(\'' +b.key+ '\')">'+b.label+'</button>').join('');
-  // count removed
+  filtersEl.innerHTML=btns.map(b=>'<button class="filter-btn '+(activeGroup===b.key?'active':'')+'\" onclick="setFilter(\'' +b.key+ '\')">'+b.label+'</button>').join('');
 }
 function setFilter(g){activeGroup=g;buildFilters();renderMatches();}
 function getVisible(){
   const now=new Date(),threeDays=new Date(now.getTime()+3*24*3600*1000);
-  // Матч считается "идущим сейчас" примерно 2.5 часа после дедлайна (с запасом на овертайм/пенальти)
   const liveWindow=2.5*3600*1000;
   if(activeSubTab==='events'){
-    return matches.filter(m=>m.type==='special'&&!m.result)
-      .sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+    let evs=matches.filter(m=>m.type==='special');
+    if(activeEventFilter==='open'){
+      evs=evs.filter(m=>now<=new Date(m.deadline));
+      return evs.sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+    } else {
+      evs=evs.filter(m=>now>new Date(m.deadline));
+      return evs.sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
+    }
   }
-  // Матчи
   let pool=matches.filter(m=>m.type==='match'&&!m.result);
   if(activeGroup!=='all')pool=pool.filter(m=>getGroup(m)===activeGroup);
   if(activeTimeFilter==='soon')pool=pool.filter(m=>new Date(m.deadline)<=threeDays);
-
-  // live — дедлайн уже прошёл, но недавно (матч сейчас идёт) — поднимаем наверх
   const live=pool.filter(m=>{const diff=now-new Date(m.deadline);return diff>0&&diff<=liveWindow;})
     .sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
   const upcoming=pool.filter(m=>now<=new Date(m.deadline)).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
   const closed=pool.filter(m=>{const diff=now-new Date(m.deadline);return diff>liveWindow;}).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
-
   return[...live,...upcoming,...closed];
 }
 
@@ -710,7 +724,7 @@ function renderMatches(){
   const b=document.getElementById('badge-pred');
   if(n>0){b.textContent=n;b.style.display='flex';}else b.style.display='none';
   if(!vis.length){
-    const msg=activeSubTab==='events'?'Нет активных событий':
+    const msg=activeSubTab==='events'?(activeEventFilter==='open'?'Нет открытых событий':'Нет закрытых событий'):
       activeTimeFilter==='soon'?'Нет матчей в ближайшие 3 дня — переключи на «Все»':'Нет активных матчей';
     el.innerHTML='<div class="empty"><div class="empty-ic">📅</div><div>'+msg+'</div></div>';return;
   }
@@ -1136,6 +1150,12 @@ function renderAdminList(){
       '<button class="del-btn" onclick="deleteMatch('+m.id+')">🗑️</button></div>'+
       '<div class="dl-badge">🕐 Дедлайн: '+dlStr+'</div>'+
       (m.result?'<div class="res-set">✅ '+m.result+' <button class="admin-btn grey sm" onclick="clearRes('+m.id+')">↺</button></div>':'')+
+      (m.type==='special'?(
+      '<div class="edit-dl-row">'+
+      '<input class="edit-dl-input" id="title-'+m.id+'" type="text" placeholder="Текст события" value="'+(m.title||'').replace(/"/g,'&quot;')+'">'+
+      '<button class="admin-btn grey sm" onclick="updateTitle('+m.id+')">✏️</button>'+
+      '</div>'
+      ):'')+
       '<div class="edit-dl-row">'+
       '<input class="edit-dl-input" id="dl-'+m.id+'" type="datetime-local" value="'+dlLocal+'">'+
       '<button class="admin-btn grey sm" onclick="updateDeadline('+m.id+')">🕐</button>'+
@@ -1162,6 +1182,27 @@ async function setResult(mid){
   if(res?.error)toast(res.error,'err');else{toast('✅ ('+res.counted+' прогнозов)','ok');await loadAll();}
 }
 async function clearRes(mid){if(!confirm('Сбросить?'))return;const res=await sbRpc('clear_match_result',{p_match_id:parseInt(mid)});if(res?.error)toast(res.error,'err');else{toast('↺ Сброшено','ok');await loadAll();}}
+async function updateTitle(mid){
+  const input=document.getElementById('title-'+mid);
+  if(!input||!input.value.trim()){toast('Введи текст события!','err');return;}
+  const newTitle=input.value.trim();
+  const btn=input.nextElementSibling;
+  if(btn){btn.textContent='...';btn.disabled=true;}
+  // Меняем ТОЛЬКО поле title — прогнозы и очки не затрагиваются
+  const res=await fetchT(SB_URL+'/rest/v1/matches?id=eq.'+mid,{
+    method:'PATCH',
+    headers:{...SB_HEADERS,'Prefer':'return=minimal'},
+    body:JSON.stringify({title:newTitle})
+  });
+  if(btn){btn.textContent='✏️';btn.disabled=false;}
+  if(!res.ok){toast('Ошибка сохранения','err');return;}
+  const m=matches.find(m=>m.id==mid);
+  if(m)m.title=newTitle;
+  toast('✅ Текст события обновлён','ok');
+  renderAdminList();
+  renderMatches();
+}
+
 async function updateDeadline(mid){
   const input=document.getElementById('dl-'+mid);
   if(!input||!input.value){toast('Выбери дату!','err');return;}
