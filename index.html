@@ -1105,28 +1105,63 @@ async function deleteUser(userId){
 
 async function showMatchPreds(mid){
   const m=matches.find(x=>x.id==mid);const title=m?m.title:'Матч '+mid;
+  const isSpecial=m?.type==='special';
+  const basePoints=m?.custom_points||2;
   const res=await sbGet('predictions','?match_id=eq.'+mid+'&select=*,users(name)&order=created_at');
   if(!Array.isArray(res)||res.error){toast('Ошибка загрузки','err');return;}
-  const rows=res.map(r=>{
-    const pts=r.points!=null?Number(r.points):null;
-    const ptsCls=pts==null?'wait':pts>0?'pos':'neg';
-    const ptsStr=pts==null?'⏳':pts>0?'+'+pts:String(pts);
-    return'<div class="pred-row">'+
-      '<span class="pr-name">'+(r.users?.name||r.user_id)+'</span>'+
-      '<span class="pr-val">'+r.prediction+'</span>'+
-      (r.is_x2?'<span class="pr-x2">×2</span>':'')+
-      '<span class="pr-pts '+ptsCls+'">'+ptsStr+'</span>'+
-      '</div>';
-  }).join('');
+
+  function buildRows(predsArr){
+    return predsArr.map(r=>{
+      const pts=r.points!=null?Number(r.points):null;
+      const ptsCls=pts==null?'wait':pts>0?'pos':'neg';
+      const ptsStr=pts==null?'⏳':pts>0?'+'+pts:String(pts);
+      const earnPts=r.is_x2?basePoints*2:basePoints;
+      // Кнопка "Засчитать" — только для особых событий, только если очки ещё не проставлены или не верные
+      const acceptBtn=isSpecial
+        ?'<button class="admin-btn sm" style="padding:3px 8px;font-size:10px;margin-left:6px" onclick="manualAccept('+r.id+','+earnPts+',this)">✓ Засчитать</button>'
+        :'';
+      return'<div class="pred-row" id="prow-'+r.id+'">'+
+        '<span class="pr-name">'+(r.users?.name||r.user_id)+'</span>'+
+        '<span class="pr-val">'+r.prediction+'</span>'+
+        (r.is_x2?'<span class="pr-x2">×2</span>':'')+
+        '<span class="pr-pts '+ptsCls+'">'+ptsStr+'</span>'+
+        acceptBtn+
+        '</div>';
+    }).join('');
+  }
+
   const bg=document.createElement('div');bg.className='pred-popup-bg';
   bg.innerHTML='<div class="pred-popup">'+
-    '<div class="pred-popup-title">📋 '+title+'</div>'+
-    (rows||'<div class="empty" style="padding:12px">Нет прогнозов</div>')+
+    '<div class="pred-popup-title">📋 '+title+(isSpecial?' <span style="font-size:11px;color:var(--gold)">(+'+basePoints+' pts)</span>':'')+'</div>'+
+    (isSpecial?'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">✓ Засчитать — вручную проставить очки за конкретный ответ</div>':'')+
+    '<div id="preds-rows">'+buildRows(res)+'</div>'+
     '<button class="modal-close" id="close-pp">Закрыть</button>'+
     '</div>';
   bg.querySelector('#close-pp').onclick=()=>bg.remove();
   bg.onclick=e=>{if(e.target===bg)bg.remove();};
   document.body.appendChild(bg);
+}
+
+async function manualAccept(predId, pts, btn){
+  if(!confirm('Засчитать этот ответ как правильный (+'+pts+' pts)?'))return;
+  btn.textContent='...';btn.disabled=true;
+  const res=await fetchT(SB_URL+'/rest/v1/predictions?id=eq.'+predId,{
+    method:'PATCH',
+    headers:{...SB_HEADERS,'Prefer':'return=minimal'},
+    body:JSON.stringify({points:pts})
+  });
+  if(!res.ok){btn.textContent='✓ Засчитать';btn.disabled=false;toast('Ошибка','err');return;}
+  // Обновляем строку в попапе
+  const row=document.getElementById('prow-'+predId);
+  if(row){
+    const ptsEl=row.querySelector('.pr-pts');
+    if(ptsEl){ptsEl.className='pr-pts pos';ptsEl.textContent='+'+pts;}
+    btn.textContent='✓ Засчитано';btn.disabled=true;btn.style.opacity='0.5';
+  }
+  toast('✅ Засчитано +'+pts+' pts','ok');
+  // Обновляем лидерборд в фоне (без закрытия попапа)
+  const lbRes=await sbGet('leaderboard','?select=*');
+  if(Array.isArray(lbRes)){lb=lbRes;renderLB(lb);updateScore(lb);}
 }
 
 function renderAdminList(){
