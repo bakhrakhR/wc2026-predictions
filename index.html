@@ -349,7 +349,12 @@ select.add-input{cursor:pointer;}
   </div>
 
   <div class="page" id="page-hist">
-    <div id="hist-list" style="margin-top:4px"><div class="loader"><div class="spin"></div></div></div>
+    <!-- Подвкладки Истории -->
+    <div class="sub-tabs" style="margin-top:8px">
+      <button class="sub-tab active" id="htab-matches" onclick="setHistTab('matches')">⚽ Матчи</button>
+      <button class="sub-tab" id="htab-events" onclick="setHistTab('events')">⭐ События</button>
+    </div>
+    <div id="hist-list"><div class="loader"><div class="spin"></div></div></div>
   </div>
 
   <div class="page" id="page-lb">
@@ -518,7 +523,7 @@ function mkTeamAvatar(name,color){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let tg; // будет установлен после загрузки telegram-web-app.js (см. initTelegram)
 let uid,uname,matches=[],preds={},lb=[],matchPreds={};
-let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',saving={},clearing={};
+let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',activeHistTab='matches',saving={},clearing={};
 let lbLoaded=false,statsLoaded=false;
 
 // x2 — один матч в день
@@ -846,54 +851,72 @@ async function clearPred(mid){
 function updateBadge(){const now=new Date();const n=matches.filter(m=>!m.result&&now<=new Date(m.deadline)&&!preds[m.id]).length;const b=document.getElementById('badge-pred');if(n>0){b.textContent=n;b.style.display='flex';}else b.style.display='none';}
 
 // ── ИСТОРИЯ ───────────────────────────────────────────────────────────────────
+function setHistTab(tab){
+  activeHistTab=tab;
+  document.querySelectorAll('#page-hist .sub-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('htab-'+tab)?.classList.add('active');
+  renderHistory();
+}
+
+function buildHistCard_pending(m){
+  const p=preds[m.id],now=new Date(),locked=now>new Date(m.deadline);
+  return'<div class="hist-card pending">'+
+    '<div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' — '+m.team2:m.title)+'</div>'+
+    '<div class="hist-time">'+(locked?'🔒':'📅 '+fmtTime(m.deadline))+'</div></div>'+
+    '<div class="hist-pred-row"><div class="hist-pred-val">Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div>'+
+    '<div class="pts wait">⏳</div></div></div>';
+}
+
+function buildHistCard_done(m){
+  const p=preds[m.id],pts=p?Number(p.points):null;
+  const ph=p&&p.points!=null?'<div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'">'+(pts>0?'+':'')+pts+' pts</div>':'<div class="pts wait">—</div>';
+  let othersHtml='';
+  if(matchPreds[m.id]){
+    const others=matchPreds[m.id].filter(r=>r.user_id!==uid);
+    if(others.length){
+      othersHtml='<div class="others-preds" style="border-top:1px solid var(--border);padding:7px 14px">'+
+        '<div class="others-title">👥 Ставки участников</div><div class="others-list">'+
+        others.map(r=>{
+          const rpts=r.points!=null?Number(r.points):null;
+          const rph=rpts!=null?'<span class="opts '+(rpts>0?'pos':'neg')+'">'+(rpts>0?'+':'')+rpts+'</span>':'';
+          return'<div class="other-chip '+(r.is_x2?'ox2':'')+'"><span class="oname">'+r.name+':</span><span>'+r.prediction+'</span>'+(r.is_x2?'<span class="x2-tag">x2</span>':'')+rph+'</div>';
+        }).join('')+'</div></div>';
+    }
+  } else if(matchPreds[m.id]===undefined){
+    loadHistMatchPreds(m.id);
+  }
+  return'<div class="hist-card" id="hcard-'+m.id+'">'+
+    '<div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' — '+m.team2:m.title)+'</div><div class="hist-res">'+m.result+'</div></div>'+
+    '<div class="hist-pred-row"><div class="hist-pred-val">'+(p?'Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':''):'<span style="color:var(--muted)">Не сделан</span>')+'</div>'+ph+'</div>'+
+    othersHtml+'</div>';
+}
+
 function renderHistory(){
   const el=document.getElementById('hist-list');
   const now=new Date();
-  const fin=matches.filter(m=>m.result).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
-  const pending=matches.filter(m=>!m.result&&preds[m.id]).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-  if(!fin.length&&!pending.length){el.innerHTML='<div class="empty"><div class="empty-ic">📋</div><div>Сделай первый прогноз — он появится здесь</div></div>';return;}
+  const type=activeHistTab==='matches'?'match':'special';
+
+  // Завершённые (с результатом) для текущей вкладки
+  const fin=matches.filter(m=>m.type===type&&m.result)
+    .sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
+  // Ожидают (прогноз есть, результата нет)
+  const pending=matches.filter(m=>m.type===type&&!m.result&&preds[m.id])
+    .sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+
+  if(!fin.length&&!pending.length){
+    el.innerHTML='<div class="empty"><div class="empty-ic">📋</div><div>'+(activeHistTab==='matches'?'Нет матчей с прогнозами':'Нет событий с прогнозами')+'</div></div>';
+    return;
+  }
+
   let html='';
+
   if(pending.length){
-    html+='<div class="section-label" style="margin-top:4px">Ожидают результата</div>';
-    html+=pending.map(m=>{
-      const p=preds[m.id],locked=now>new Date(m.deadline);
-      return'<div class="hist-card pending">'+
-        '<div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' — '+m.team2:m.title)+'</div>'+
-        '<div class="hist-time">'+(locked?'🔒':'📅 '+fmtTime(m.deadline))+'</div></div>'+
-        '<div class="hist-pred-row"><div class="hist-pred-val">Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div>'+
-        '<div class="pts wait">⏳</div></div></div>';
-    }).join('');
+    html+='<div class="section-label" style="margin-top:4px">⏳ Ожидаем</div>';
+    html+=pending.map(buildHistCard_pending).join('');
   }
   if(fin.length){
-    html+='<div class="section-label" style="margin-top:'+(pending.length?'14px':'4px')+'">Сыгранные</div>';
-    html+=fin.map(m=>{
-      const p=preds[m.id],pts=p?Number(p.points):null;
-      const ph=p&&p.points!=null?'<div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'">'+(pts>0?'+':'')+pts+' pts</div>':'<div class="pts wait">—</div>';
-      // Прогнозы других участников (из matchPreds если загружены)
-      let othersHtml='';
-      if(matchPreds[m.id]){
-        const others=matchPreds[m.id].filter(r=>r.user_id!==uid);
-        if(others.length){
-          othersHtml='<div class="others-preds" style="border-top:1px solid var(--border);padding:7px 14px">'+
-            '<div class="others-title">👥 Ставки участников</div>'+
-            '<div class="others-list">'+
-            others.map(r=>{
-              const rpts=r.points!=null?Number(r.points):null;
-              const rph=rpts!=null?'<span class="opts '+(rpts>0?'pos':'neg')+'">'+(rpts>0?'+':'')+rpts+'</span>':'';
-              return'<div class="other-chip '+(r.is_x2?'ox2':'')+'"><span class="oname">'+r.name+':</span><span>'+r.prediction+'</span>'+(r.is_x2?'<span class="x2-tag">x2</span>':'')+rph+'</div>';
-            }).join('')+
-            '</div></div>';
-        }
-      } else if(matchPreds[m.id]===undefined){
-        // Загружаем ставки для этого матча
-        loadHistMatchPreds(m.id);
-      }
-      return'<div class="hist-card" id="hcard-'+m.id+'">'+
-        '<div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' — '+m.team2:m.title)+'</div><div class="hist-res">'+m.result+'</div></div>'+
-        '<div class="hist-pred-row"><div class="hist-pred-val">'+(p?'Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':''):'<span style="color:var(--muted)">Не сделан</span>')+'</div>'+ph+'</div>'+
-        othersHtml+
-        '</div>';
-    }).join('');
+    html+='<div class="section-label" style="margin-top:'+(pending.length?'14px':'4px')+'">✅ Завершённые</div>';
+    html+=fin.map(buildHistCard_done).join('');
   }
   el.innerHTML=html;
 }
@@ -1294,6 +1317,7 @@ function switchTab(tab,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   if(el)el.classList.add('active');document.getElementById('page-'+tab).classList.add('active');
   if(tab==='lb')loadLB();if(tab==='stats')loadStats();
+  if(tab==='hist')renderHistory();
   if(tab==='admin'){renderAdminList();loadAdminStats();loadAdminUsers();}
 }
 let tt;
