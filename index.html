@@ -251,6 +251,15 @@ select.add-input{cursor:pointer;}
 .pred-row .pr-x2{background:var(--red);color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;}
 .pred-row .pr-pts{font-weight:800;min-width:40px;text-align:right;}
 .pred-row .pr-pts.pos{color:var(--green);}.pred-row .pr-pts.neg{color:var(--red);}.pred-row .pr-pts.wait{color:var(--muted);}
+/* ── WINNER PICK ── */
+.winner-pick{padding:10px 14px 6px;border-top:1px solid var(--border);background:#0f1e10;}
+.winner-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;text-align:center;}
+.winner-flags{display:flex;gap:8px;}
+.winner-flag{flex:1;background:var(--card2);border:2px solid var(--coral);border-radius:12px;padding:10px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:10px;font-weight:700;color:var(--muted);transition:all 0.2s;text-align:center;line-height:1.2;}
+.winner-flag:disabled{cursor:default;opacity:0.5;}
+.winner-flag.winner-selected{border-color:var(--green);background:#1a3020;color:var(--text);}
+.winner-flag.winner-unselected{border-color:var(--border);opacity:0.4;}
+.winner-hint{font-size:9px;color:var(--coral);text-align:center;margin-top:6px;font-weight:700;}
 /* ── SUB-TABS ── */
 .sub-tabs{display:flex;gap:6px;margin-bottom:10px;}
 .sub-tab{flex:1;padding:10px;background:var(--card);border:none;border-radius:12px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.18s;text-align:center;}
@@ -523,7 +532,7 @@ function mkTeamAvatar(name,color){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let tg; // будет установлен после загрузки telegram-web-app.js (см. initTelegram)
 let uid,uname,matches=[],preds={},lb=[],matchPreds={};
-let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',activeHistTab='matches',saving={},clearing={};
+let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',activeHistTab='matches',saving={},clearing={},winnerPicks={};
 let lbLoaded=false,statsLoaded=false;
 
 // x2 — один матч в день
@@ -740,61 +749,108 @@ function buildCard(m){
   const now=new Date(),locked=now>new Date(m.deadline),p=preds[m.id],hasRes=!!m.result;
   const{text:dlTxt,cls:dlCls}=fmtDL(m.deadline);const isX2=p?.is_x2;
   const grp=getGroup(m);
+  const isKnockout=m.type==='match'&&!grp; // плей-офф = матч без группы
+
   let body='';
   if(m.type==='match'){
-    const parts=p?p.prediction.split(':'):['',''];
+    // Парсим прогноз: "1:1|Spain" → scorePart="1:1", storedWinner="Spain"
+    const rawPred=p?p.prediction:'';
+    const scorePart0=rawPred.includes('|')?rawPred.split('|')[0]:rawPred;
+    const storedWinner=rawPred.includes('|')?rawPred.split('|').slice(1).join('|'):'';
+    const parts=scorePart0?scorePart0.split(':'):['',''];
+
+    // Синхронизируем winnerPicks из сохранённого прогноза
+    if(storedWinner&&winnerPicks[m.id]===undefined)winnerPicks[m.id]=storedWinner;
+    const curWinner=winnerPicks[m.id]||'';
+
     const c1=teamColor(m.team1),c2=teamColor(m.team2);
+
     // Liga bar
     let ligaHtml='';
     if(matchPreds[m.id]&&matchPreds[m.id].length>0){
       const all=matchPreds[m.id];const tot=all.length;
-      const h1=all.filter(r=>{const pp=r.prediction?.split(':').map(Number);return pp&&pp[0]>pp[1];}).length;
+      const h1=all.filter(r=>{const pp=r.prediction?.split('|')[0]?.split(':').map(Number);return pp&&pp[0]>pp[1];}).length;
       const pct1=Math.round(h1/tot*100);const pct2=100-pct1;
       ligaHtml='<div class="liga-bar-wrap"><div class="liga-label"><span class="pct1">'+pct1+'%</span><span class="liga-txt">лига ставит</span><span class="pct2">'+pct2+'%</span></div><div class="liga-bar"><div class="liga-bar-fill1" style="width:'+pct1+'%"></div><div class="liga-bar-fill2"></div></div></div>';
     }
+
+    // Определяем начальное состояние ничьей для winner picker
+    const s1Init=parts[0]||'',s2Init=parts[1]||'';
+    const isInitDraw=s1Init!==''&&s2Init!==''&&s1Init===s2Init;
+    const showPicker=isKnockout&&!locked&&isInitDraw;
+
+    // Winner picker (только плей-офф, только если не заблокировано)
+    const w1cls=curWinner&&curWinner.toLowerCase()===m.team1.toLowerCase()?'winner-selected':(curWinner?'winner-unselected':'');
+    const w2cls=curWinner&&curWinner.toLowerCase()===m.team2.toLowerCase()?'winner-selected':(curWinner?'winner-unselected':'');
+    const winnerPickerHtml=isKnockout&&!locked?
+      '<div class="winner-pick" id="winner-pick-'+m.id+'" style="display:'+(showPicker?'block':'none')+'">'+
+      '<div class="winner-label">Кто пройдёт дальше? (+3 pts)</div>'+
+      '<div class="winner-flags">'+
+      '<button class="winner-flag '+w1cls+'" data-team="'+m.team1.replace(/"/g,'&quot;')+'" onclick="pickWinner('+m.id+',this)"'+(locked?' disabled':'')+'>'+
+        mkTeamAvatar(m.team1,c1)+'<span>'+m.team1+'</span></button>'+
+      '<button class="winner-flag '+w2cls+'" data-team="'+m.team2.replace(/"/g,'&quot;')+'" onclick="pickWinner('+m.id+',this)"'+(locked?' disabled':'')+'>'+
+        mkTeamAvatar(m.team2,c2)+'<span>'+m.team2+'</span></button>'+
+      '</div>'+
+      '<div class="winner-hint">⚡ x2 не влияет на этот бонус</div>'+
+      '</div>':
+      '';
+
     body='<div class="score-row">'+
       '<div class="team-block">'+mkTeamAvatar(m.team1,c1)+
       '<div class="team-name">'+m.team1+'</div>'+
-      '<div class="score-inputs"><input class="score-box" id="s1-'+m.id+'" type="number" min="0" max="99" value="'+(parts[0]||'')+'" placeholder="—"'+(locked?' disabled':'')+'>'+
+      '<div class="score-inputs"><input class="score-box" id="s1-'+m.id+'" type="number" min="0" max="99" value="'+s1Init+'" placeholder="—"'+(locked?' disabled':'')+' oninput="checkDrawState('+m.id+')">'+
       '</div></div>'+
       '<div class="score-sep" style="padding:0 4px 18px">—</div>'+
       '<div class="team-block">'+mkTeamAvatar(m.team2,c2)+
       '<div class="team-name">'+m.team2+'</div>'+
-      '<div class="score-inputs"><input class="score-box" id="s2-'+m.id+'" type="number" min="0" max="99" value="'+(parts[1]||'')+'" placeholder="—"'+(locked?' disabled':'')+'>'+
+      '<div class="score-inputs"><input class="score-box" id="s2-'+m.id+'" type="number" min="0" max="99" value="'+s2Init+'" placeholder="—"'+(locked?' disabled':'')+' oninput="checkDrawState('+m.id+')">'+
       '</div></div>'+
-      '</div>'+ligaHtml;
+      '</div>'+ligaHtml+winnerPickerHtml;
+
   } else {
     const pts=m.custom_points||2;
     body='<div class="special-wrap"><div class="special-title">🌟 '+m.title+'<span class="special-pts">+'+pts+' pts</span></div>'+
       '<input class="special-input" id="sp-'+m.id+'" type="text" placeholder="Твой ответ..." value="'+(p?.prediction||'')+'\"'+(locked?' disabled':'')+'>'+
       '</div>';
   }
-  const resHtml=hasRes?'<div class="result-badge">✅ '+m.result+'</div>':'';
+
+  const resHtml=hasRes?'<div class="result-badge">✅ '+m.result.split('|')[0]+(m.result.includes('|')?' → <b>'+m.result.split('|')[1]+'</b>':'')+'</div>':'';
+
+  // pred-info: показываем счёт + выбранного победителя если есть
   let predInfo='';
   if(p){
+    const rawPred=p.prediction;
+    const dispScore=rawPred.includes('|')?rawPred.split('|')[0]:rawPred;
+    const dispWinner=rawPred.includes('|')?rawPred.split('|')[1]:'';
+    const dispStr='<b>'+dispScore+'</b>'+(dispWinner?' <span style="color:var(--teal)">→ '+dispWinner+'</span>':'');
     const pts=Number(p.points);
     if(hasRes&&p.points!=null){
-      predInfo='<div class="pred-info"><div class="pred-val">Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div><div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'\">'+(pts>0?'+':'')+pts+' pts</div></div>';
+      predInfo='<div class="pred-info"><div class="pred-val">Прогноз: '+dispStr+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div><div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'\">'+(pts>0?'+':'')+pts+' pts</div></div>';
     } else {
-      predInfo='<div class="pred-info"><div class="pred-val">Прогноз: <b>'+p.prediction+'</b>'+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div><div class="pts wait">⏳ ждём</div></div>';
+      predInfo='<div class="pred-info"><div class="pred-val">Прогноз: '+dispStr+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div><div class="pts wait">⏳ ждём</div></div>';
     }
   }
+
   let othersHtml='';
   if(locked&&matchPreds[m.id]){
     const others=matchPreds[m.id].filter(r=>r.user_id!==uid);
     if(others.length){
       othersHtml='<div class="others-preds"><div class="others-title">👥 Прогнозы игроков</div><div class="others-list">'+
-        others.map(r=>{const pts=Number(r.points);const ph=r.points!=null?'<span class="opts '+(pts>0?'pos':'neg')+'\">'+(pts>0?'+':'')+pts+'</span>':'';
-          return'<div class="other-chip '+(r.is_x2?'ox2':'')+'"><span class="oname">'+r.name+':</span><span>'+r.prediction+'</span>'+(r.is_x2?'<span class="x2-tag">x2</span>':'')+ph+'</div>';
+        others.map(r=>{
+          const pts=Number(r.points);const ph=r.points!=null?'<span class="opts '+(pts>0?'pos':'neg')+'\">'+(pts>0?'+':'')+pts+'</span>':'';
+          const dispP=r.prediction.includes('|')?r.prediction.split('|')[0]+'→'+r.prediction.split('|')[1]:r.prediction;
+          return'<div class="other-chip '+(r.is_x2?'ox2':'')+'"><span class="oname">'+r.name+':</span><span>'+dispP+'</span>'+(r.is_x2?'<span class="x2-tag">x2</span>':'')+ph+'</div>';
         }).join('')+'</div></div>';
     }
   } else if(locked&&matchPreds[m.id]===undefined)loadMatchPreds(m.id);
+
   const bottom=!locked?'<div class="card-bottom">'+
     '<button class="x2-btn '+(isX2?'active':m.type!=='special'&&getX2UsedMatchId(m.id)&&!isX2?'used':'')+'\" id="x2-'+m.id+'" onclick="toggleX2(\''+m.id+'\')">🎲 ×2</button>'+
     (p?'<button class="clear-btn" onclick="clearPred(\''+m.id+'\')">✕</button>':'')+
     '<button class="save-btn" id="save-'+m.id+'" onclick="save(\''+m.id+'\',\''+m.type+'\')">✓ Сохранить</button>'+
     '</div>':'';
-  const headerLabel=m.type==='match'?(grp?'Группа '+grp:'⚽ Матч'):'🌟 Особое событие';
+
+  const headerLabel=m.type==='match'?(grp?'Группа '+grp:'⚽ Плей-офф'):'🌟 Особое событие';
   return'<div class="match-card '+(p?'has-pred':'')+' '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+' '+(m.type==='special'?'special-card':'')+'\" id="card-'+m.id+'">'+
     '<div class="match-header"><div class="match-group">'+headerLabel+'</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
     body+resHtml+predInfo+othersHtml+bottom+'</div>';
@@ -809,6 +865,34 @@ async function loadMatchPreds(mid){
     if(m&&card)card.outerHTML=buildCard(m);
   }
 }
+// ── WINNER PICKER ────────────────────────────────────────────────────────────
+function checkDrawState(mid){
+  const s1=document.getElementById('s1-'+mid)?.value;
+  const s2=document.getElementById('s2-'+mid)?.value;
+  const pickerEl=document.getElementById('winner-pick-'+mid);
+  if(!pickerEl)return;
+  const isDraw=s1!==''&&s2!==''&&!isNaN(parseInt(s1))&&!isNaN(parseInt(s2))&&parseInt(s1)===parseInt(s2);
+  pickerEl.style.display=isDraw?'block':'none';
+  if(!isDraw){
+    // Сбрасываем выбор победителя при не-ничье
+    delete winnerPicks[mid];
+    pickerEl.querySelectorAll('.winner-flag').forEach(b=>{
+      b.classList.remove('winner-selected','winner-unselected');
+    });
+  }
+}
+
+function pickWinner(mid,btn){
+  const team=btn.dataset.team;
+  winnerPicks[mid]=team;
+  const picker=document.getElementById('winner-pick-'+mid);
+  if(!picker)return;
+  picker.querySelectorAll('.winner-flag').forEach(b=>{
+    b.classList.toggle('winner-selected',b.dataset.team===team);
+    b.classList.toggle('winner-unselected',b.dataset.team!==team);
+  });
+}
+
 function toggleX2(mid){
   const btn=document.getElementById('x2-'+mid);if(!btn)return;
   const isActive=btn.classList.contains('active');
@@ -824,7 +908,15 @@ async function save(mid,type){
   let prediction;
   if(type==='match'){
     const s1=document.getElementById('s1-'+mid)?.value,s2=document.getElementById('s2-'+mid)?.value;
-    if(s1===''||s2===''){toast('Введи счёт!','err');return;}prediction=s1+':'+s2;
+    if(s1===''||s2===''){toast('Введи счёт!','err');return;}
+    prediction=s1+':'+s2;
+    // Для плей-офф ничьих добавляем выбор победителя
+    const matchObj=matches.find(m=>m.id==mid);
+    const isKnockoutSave=matchObj&&!getGroup(matchObj);
+    if(isKnockoutSave&&parseInt(s1)===parseInt(s2)&&!isNaN(parseInt(s1))&&winnerPicks[mid]){
+      prediction+='+'+winnerPicks[mid]; // временно, будет заменено
+      prediction=s1+':'+s2+'|'+winnerPicks[mid];
+    }
   } else {prediction=document.getElementById('sp-'+mid)?.value.trim();if(!prediction){toast('Введи ответ!','err');return;}}
   const isX2=document.getElementById('x2-'+mid)?.classList.contains('active')||false;
   const btn=document.getElementById('save-'+mid);if(btn){btn.textContent='...';btn.disabled=true;}
@@ -843,7 +935,7 @@ async function clearPred(mid){
   const res=await sbRpc('clear_prediction',{p_user_id:uid,p_match_id:parseInt(mid)});
   clearing[mid]=false;
   if(res?.error){toast(res.error,'err');}else{
-    toast('🗑️ Прогноз убран','ok');delete preds[mid];
+    toast('🗑️ Прогноз убран','ok');delete preds[mid];delete winnerPicks[mid];
     const card=document.getElementById('card-'+mid);const m=matches.find(m=>m.id==mid);
     if(m&&card)card.outerHTML=buildCard(m);updateBadge();
   }
@@ -1201,6 +1293,7 @@ function renderAdminList(){
   el.innerHTML=sorted.map(m=>{
     const pts=m.custom_points?'(+'+m.custom_points+' pts)':'';
     const dlStr=m.deadline?fmtTime(m.deadline):'?';
+    const isKnockoutAdmin=m.type==='match'&&!getGroup(m); // плей-офф матч
     // Конвертируем deadline в формат для datetime-local input
     const dlLocal=m.deadline?new Date(new Date(m.deadline).getTime()).toISOString().slice(0,16):'';
     return'<div class="admin-card" id="acard-'+m.id+'">'+
@@ -1219,14 +1312,29 @@ function renderAdminList(){
       '<button class="admin-btn grey sm" onclick="updateDeadline('+m.id+')">🕐</button>'+
       '</div>'+
       '<div class="admin-row" style="margin-top:6px">'+
-      '<input class="admin-input" id="res-'+m.id+'" type="text" placeholder="'+(m.type==='match'?'2:1':'результат')+'" value="'+(m.result||'')+'">'+
+      '<input class="admin-input" id="res-'+m.id+'" type="text" placeholder="'+(m.type==='match'?'2:1':'результат')+' '+(isKnockoutAdmin?'(ничья: 1:1|Spain)':'')+('" value="'+(m.result||'')+'" oninput="checkAdminDraw('+m.id+')">')+
       '<button class="admin-btn" id="abtn-'+m.id+'" onclick="setResult('+m.id+')">✓</button>'+
       '<button class="admin-btn grey sm" onclick="showMatchPreds('+m.id+')">👁</button>'+
-      '</div></div>';
+      '</div>'+
+      (isKnockoutAdmin?
+        '<div id="adm-pick-'+m.id+'" style="display:none;padding:6px 0">'+
+        '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Кто прошёл дальше:</div>'+
+        '<div style="display:flex;gap:6px">'+
+        '<button class="admin-btn grey sm" id="adw1-'+m.id+'" data-team="'+m.team1.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+m.team1+'</button>'+
+        '<button class="admin-btn grey sm" id="adw2-'+m.id+'" data-team="'+m.team2.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+m.team2+'</button>'+
+        '</div></div>':
+        '')+
+      '</div>';
   }).join('');
 }
-// Нормализация счёта: "1 1", "1-1" → "1:1"
+// Нормализация счёта: "1 1", "1-1" → "1:1"; "1 1|Spain" → "1:1|Spain"
 function normalizeScore(s){
+  if(s.includes('|')){
+    const idx=s.indexOf('|');
+    const score=s.substring(0,idx).trim().replace(/[\s\-]+/g,':').replace(/::+/g,':');
+    const winner=s.substring(idx+1).trim();
+    return score+(winner?'|'+winner:'');
+  }
   return s.trim().replace(/[\s\-]+/g,':').replace(/::+/g,':');
 }
 
@@ -1240,6 +1348,28 @@ async function setResult(mid){
   if(res?.error)toast(res.error,'err');else{toast('✅ ('+res.counted+' прогнозов)','ok');await loadAll();}
 }
 async function clearRes(mid){if(!confirm('Сбросить?'))return;const res=await sbRpc('clear_match_result',{p_match_id:parseInt(mid)});if(res?.error)toast(res.error,'err');else{toast('↺ Сброшено','ok');await loadAll();}}
+function checkAdminDraw(mid){
+  const resVal=document.getElementById('res-'+mid)?.value||'';
+  const score=resVal.split('|')[0];
+  const parts=score.trim().replace(/[\s\-]+/g,':').split(':');
+  const isDraw=parts.length===2&&parts[0]!==''&&parts[0]===parts[1]&&!isNaN(parseInt(parts[0]));
+  const picker=document.getElementById('adm-pick-'+mid);
+  if(picker)picker.style.display=isDraw?'block':'none';
+}
+function adminPickWinner(mid,btn){
+  const team=btn.dataset.team;
+  const resInput=document.getElementById('res-'+mid);
+  if(!resInput)return;
+  const score=resInput.value.split('|')[0].trim();
+  resInput.value=score+'|'+team;
+  document.querySelectorAll('#adm-pick-'+mid+' .admin-btn').forEach(b=>{
+    const sel=b.dataset.team===team;
+    b.style.background=sel?'var(--green)':'';
+    b.style.color=sel?'#0a0a0a':'';
+    b.style.border=sel?'none':'';
+  });
+}
+
 async function updateTitle(mid){
   const input=document.getElementById('title-'+mid);
   if(!input||!input.value.trim()){toast('Введи текст события!','err');return;}
