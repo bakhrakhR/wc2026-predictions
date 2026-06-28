@@ -677,9 +677,19 @@ function setSubTab(tab){
   activeSubTab=tab;activeGroup='all';
   document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active'));
   document.getElementById('subtab-'+tab)?.classList.add('active');
-  document.getElementById('matches-filters').style.display=tab==='matches'?'block':'none';
-  document.getElementById('events-filters').style.display=tab==='events'?'block':'none';
-  buildFilters();renderMatches();
+  const mf=document.getElementById('matches-filters');
+  const ef=document.getElementById('events-filters');
+  if(mf)mf.style.display=tab==='matches'?'block':'none';
+  if(ef)ef.style.display=tab==='events'?'block':'none';
+  // Сброс фильтра событий при переключении на матчи
+  if(tab==='matches'){
+    activeTimeFilter='soon';
+    document.querySelectorAll('#matches-filters .time-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('tbtn-soon')?.classList.add('active');
+  }
+  buildFilters();
+  // Небольшая задержка чтобы DOM успел обновиться
+  setTimeout(renderMatches,10);
 }
 function setEventFilter(ef){
   activeEventFilter=ef;
@@ -742,7 +752,12 @@ function renderMatches(){
       activeTimeFilter==='soon'?'Нет матчей в ближайшие 3 дня — переключи на «Все»':'Нет активных матчей';
     el.innerHTML='<div class="empty"><div class="empty-ic">📅</div><div>'+msg+'</div></div>';return;
   }
-  el.innerHTML=vis.map(buildCard).join('');
+  el.innerHTML=vis.map(m=>{
+    try{return buildCard(m);}
+    catch(e){console.error('buildCard error',m.id,e.message);
+      return '<div class="match-card" style="padding:12px;color:var(--red)">⚠️ '+m.title+' (ошибка)</div>';}
+  }).join('');
+  setTimeout(initFlagErrors,50);
 }
 
 function buildCard(m){
@@ -754,7 +769,7 @@ function buildCard(m){
   let body='';
   if(m.type==='match'){
     // Парсим прогноз: "1:1|Spain" → scorePart="1:1", storedWinner="Spain"
-    const rawPred=p?p.prediction:'';
+    const rawPred=(p&&p.prediction!=null)?p.prediction:'';
     const scorePart0=rawPred.includes('|')?rawPred.split('|')[0]:rawPred;
     const storedWinner=rawPred.includes('|')?rawPred.split('|').slice(1).join('|'):'';
     const parts=scorePart0?scorePart0.split(':'):['',''];
@@ -814,7 +829,8 @@ function buildCard(m){
       '</div>';
   }
 
-  const resHtml=hasRes?'<div class="result-badge">✅ '+m.result.split('|')[0]+(m.result.includes('|')?' → <b>'+m.result.split('|')[1]+'</b>':'')+'</div>':'';
+  const resScore=m.result?m.result.split('|')[0]:'';const resWinner=m.result&&m.result.includes('|')?m.result.split('|')[1]:'';
+  const resHtml=hasRes?'<div class="result-badge">✅ '+resScore+(resWinner?' → <b>'+resWinner+'</b>':'')+'</div>':'';
 
   // pred-info: показываем счёт + выбранного победителя если есть
   let predInfo='';
@@ -914,7 +930,6 @@ async function save(mid,type){
     const matchObj=matches.find(m=>m.id==mid);
     const isKnockoutSave=matchObj&&!getGroup(matchObj);
     if(isKnockoutSave&&parseInt(s1)===parseInt(s2)&&!isNaN(parseInt(s1))&&winnerPicks[mid]){
-      prediction+='+'+winnerPicks[mid]; // временно, будет заменено
       prediction=s1+':'+s2+'|'+winnerPicks[mid];
     }
   } else {prediction=document.getElementById('sp-'+mid)?.value.trim();if(!prediction){toast('Введи ответ!','err');return;}}
@@ -1312,7 +1327,7 @@ function renderAdminList(){
       '<button class="admin-btn grey sm" onclick="updateDeadline('+m.id+')">🕐</button>'+
       '</div>'+
       '<div class="admin-row" style="margin-top:6px">'+
-      '<input class="admin-input" id="res-'+m.id+'" type="text" placeholder="'+(m.type==='match'?'2:1':'результат')+' '+(isKnockoutAdmin?'(ничья: 1:1|Spain)':'')+('" value="'+(m.result||'')+'" oninput="checkAdminDraw('+m.id+')">')+
+      '<input class="admin-input" id="res-'+m.id+'" type="text" placeholder="'+(m.type==='match'?'2:1'+(isKnockoutAdmin?' или 1:1|Spain':''):'результат')+'" value="'+(m.result||'')+'" oninput="checkAdminDraw('+m.id+')">'+
       '<button class="admin-btn" id="abtn-'+m.id+'" onclick="setResult('+m.id+')">✓</button>'+
       '<button class="admin-btn grey sm" onclick="showMatchPreds('+m.id+')">👁</button>'+
       '</div>'+
