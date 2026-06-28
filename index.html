@@ -1162,24 +1162,31 @@ async function loadAdminStats(){
 }
 async function loadAdminUsers(){
   const el=document.getElementById('admin-users');
-  const[usersRes,predsRes]=await Promise.all([
-    sbGet('users','?select=*&order=created_at'),
-    sbGet('predictions','?select=user_id')
-  ]);
-  const users=Array.isArray(usersRes)?usersRes:[];
-  const predCounts={};
-  (Array.isArray(predsRes)?predsRes:[]).forEach(p=>{predCounts[p.user_id]=(predCounts[p.user_id]||0)+1;});
-  if(!users.length){el.innerHTML='<div class="empty" style="padding:12px">Нет игроков</div>';return;}
-  el.innerHTML=users.map(u=>{
-    const ini=u.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-    const cnt=predCounts[u.user_id]||0;
-    const isMe=u.user_id===uid;
-    return'<div class="user-row">'+
-      '<div class="u-avatar">'+ini+'</div>'+
-      '<div class="u-info"><div class="u-name">'+u.name+(isMe?' (я)':'')+'</div><div class="u-id">'+u.user_id+' · '+cnt+' прогнозов</div></div>'+
-      (isMe?'':'<button class="u-del" onclick="deleteUser(\'' +u.user_id+ '\')">✕ Удалить</button>')+
-      '</div>';
-  }).join('');
+  if(!el)return;
+  try{
+    const[usersRes,predsRes]=await Promise.all([
+      sbGet('users','?select=*&order=created_at'),
+      sbGet('predictions','?select=user_id')
+    ]);
+    if(usersRes?.error){el.innerHTML='<div class="empty" style="padding:12px;color:var(--red)">Ошибка: '+usersRes.error+'</div>';return;}
+    const users=Array.isArray(usersRes)?usersRes:[];
+    const predCounts={};
+    (Array.isArray(predsRes)?predsRes:[]).forEach(p=>{if(p.user_id)predCounts[p.user_id]=(predCounts[p.user_id]||0)+1;});
+    if(!users.length){el.innerHTML='<div class="empty" style="padding:12px">Нет игроков</div>';return;}
+    el.innerHTML=users.map(u=>{
+      const name=u.name||'(без имени)';
+      const ini=name.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase()||'?';
+      const cnt=predCounts[u.user_id]||0;
+      const isMe=u.user_id===uid;
+      return'<div class="user-row">'+
+        '<div class="u-avatar">'+ini+'</div>'+
+        '<div class="u-info"><div class="u-name">'+name+(isMe?' (я)':'')+'</div><div class="u-id">'+(u.user_id||'?')+' · '+cnt+' прогнозов</div></div>'+
+        (isMe?'':'<button class="u-del" onclick="deleteUser(\'' +(u.user_id||'')+ '\')">✕ Удалить</button>')+
+        '</div>';
+    }).join('');
+  }catch(e){
+    if(el)el.innerHTML='<div class="empty" style="padding:12px;color:var(--red)">Ошибка загрузки: '+e.message+'</div>';
+  }
 }
 
 async function mergeUsers(){
@@ -1306,40 +1313,47 @@ function renderAdminList(){
     ...withResult.sort((a,b)=>new Date(b.deadline)-new Date(a.deadline))
   ];
   el.innerHTML=sorted.map(m=>{
-    const pts=m.custom_points?'(+'+m.custom_points+' pts)':'';
-    const dlStr=m.deadline?fmtTime(m.deadline):'?';
-    const isKnockoutAdmin=m.type==='match'&&!getGroup(m); // плей-офф матч
-    // Конвертируем deadline в формат для datetime-local input
-    const dlLocal=m.deadline?new Date(new Date(m.deadline).getTime()).toISOString().slice(0,16):'';
-    return'<div class="admin-card" id="acard-'+m.id+'">'+
-      '<div class="admin-title"><span>'+(m.type==='match'?'⚽':'🌟')+' '+(m.title||m.team1+' vs '+m.team2)+' '+pts+'</span>'+
-      '<button class="del-btn" onclick="deleteMatch('+m.id+')">🗑️</button></div>'+
-      '<div class="dl-badge">🕐 Дедлайн: '+dlStr+'</div>'+
-      (m.result?'<div class="res-set">✅ '+m.result+' <button class="admin-btn grey sm" onclick="clearRes('+m.id+')">↺</button></div>':'')+
-      (m.type==='special'?(
-      '<div class="edit-dl-row">'+
-      '<input class="edit-dl-input" id="title-'+m.id+'" type="text" placeholder="Текст события" value="'+(m.title||'').replace(/"/g,'&quot;')+'">'+
-      '<button class="admin-btn grey sm" onclick="updateTitle('+m.id+')">✏️</button>'+
-      '</div>'
-      ):'')+
-      '<div class="edit-dl-row">'+
-      '<input class="edit-dl-input" id="dl-'+m.id+'" type="datetime-local" value="'+dlLocal+'">'+
-      '<button class="admin-btn grey sm" onclick="updateDeadline('+m.id+')">🕐</button>'+
-      '</div>'+
-      '<div class="admin-row" style="margin-top:6px">'+
-      '<input class="admin-input" id="res-'+m.id+'" type="text" placeholder="'+(m.type==='match'?'2:1'+(isKnockoutAdmin?' или 1:1|Spain':''):'результат')+'" value="'+(m.result||'')+'" oninput="checkAdminDraw('+m.id+')">'+
-      '<button class="admin-btn" id="abtn-'+m.id+'" onclick="setResult('+m.id+')">✓</button>'+
-      '<button class="admin-btn grey sm" onclick="showMatchPreds('+m.id+')">👁</button>'+
-      '</div>'+
-      (isKnockoutAdmin?
-        '<div id="adm-pick-'+m.id+'" style="display:none;padding:6px 0">'+
-        '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Кто прошёл дальше:</div>'+
-        '<div style="display:flex;gap:6px">'+
-        '<button class="admin-btn grey sm" id="adw1-'+m.id+'" data-team="'+m.team1.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+m.team1+'</button>'+
-        '<button class="admin-btn grey sm" id="adw2-'+m.id+'" data-team="'+m.team2.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+m.team2+'</button>'+
-        '</div></div>':
-        '')+
-      '</div>';
+    try{
+      const pts=m.custom_points?'(+'+m.custom_points+' pts)':'';
+      const dlStr=m.deadline?fmtTime(m.deadline):'?';
+      const _grpM=m.type==='match'&&m.title?m.title.match(/Group ([A-L])/i):null;const grpAdmin=_grpM?_grpM[1]:null;
+      const isKnockoutAdmin=m.type==='match'&&!grpAdmin;
+      const dlLocal=m.deadline?new Date(m.deadline).toISOString().slice(0,16):'';
+      const t1=m.team1||'';const t2=m.team2||'';
+      const titleDisplay=m.title||(t1&&t2?t1+' vs '+t2:'Матч '+m.id);
+      return'<div class="admin-card" id="acard-'+m.id+'">'+
+        '<div class="admin-title"><span>'+(m.type==='match'?'⚽':'🌟')+' '+titleDisplay+' '+pts+'</span>'+
+        '<button class="del-btn" onclick="deleteMatch('+m.id+')">🗑️</button></div>'+
+        '<div class="dl-badge">🕐 Дедлайн: '+dlStr+'</div>'+
+        (m.result?'<div class="res-set">✅ '+m.result+' <button class="admin-btn grey sm" onclick="clearRes('+m.id+')">↺</button></div>':'')+
+        (m.type==='special'?
+          '<div class="edit-dl-row">'+
+          '<input class="edit-dl-input" id="title-'+m.id+'" type="text" placeholder="Текст события" value="'+(m.title||'').replace(/"/g,'&quot;')+'">'+
+          '<button class="admin-btn grey sm" onclick="updateTitle('+m.id+')">✏️</button>'+
+          '</div>':'')+
+        '<div class="edit-dl-row">'+
+        '<input class="edit-dl-input" id="dl-'+m.id+'" type="datetime-local" value="'+dlLocal+'">'+
+        '<button class="admin-btn grey sm" onclick="updateDeadline('+m.id+')">🕐</button>'+
+        '</div>'+
+        '<div class="admin-row" style="margin-top:6px">'+
+        '<input class="admin-input" id="res-'+m.id+'" type="text" '+
+          'placeholder="'+(m.type==='match'?'2:1'+(isKnockoutAdmin?' или 1:1|Spain':''):'результат')+'" '+
+          'value="'+(m.result||'')+'" oninput="checkAdminDraw('+m.id+')">'+
+        '<button class="admin-btn" id="abtn-'+m.id+'" onclick="setResult('+m.id+')">✓</button>'+
+        '<button class="admin-btn grey sm" onclick="showMatchPreds('+m.id+')">👁</button>'+
+        '</div>'+
+        (isKnockoutAdmin&&t1&&t2?
+          '<div id="adm-pick-'+m.id+'" style="display:none;padding:6px 0">'+
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Кто прошёл дальше:</div>'+
+          '<div style="display:flex;gap:6px">'+
+          '<button class="admin-btn grey sm" id="adw1-'+m.id+'" data-team="'+t1.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+t1+'</button>'+
+          '<button class="admin-btn grey sm" id="adw2-'+m.id+'" data-team="'+t2.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+t2+'</button>'+
+          '</div></div>':'')+
+        '</div>';
+    }catch(e){
+      console.error('Admin card error for match',m.id,e.message);
+      return'<div class="admin-card"><div class="admin-title">⚠️ '+(m.title||'Матч '+m.id)+'</div><div style="color:var(--red);font-size:11px">Ошибка: '+e.message+'</div></div>';
+    }
   }).join('');
 }
 // Нормализация счёта: "1 1", "1-1" → "1:1"; "1 1|Spain" → "1:1|Spain"
