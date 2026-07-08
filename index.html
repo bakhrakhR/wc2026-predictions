@@ -1516,6 +1516,11 @@ async function loadAdminEvents(mid){
   const box=document.getElementById('adm-events-'+mid);
   if(box)box.innerHTML='<div style="text-align:center;padding:8px"><div class="spin" style="width:18px;height:18px;margin:0 auto"></div></div>';
   const res=await sbGet('match_events','?match_id=eq.'+mid+'&select=*&order=sort_order');
+  if(res&&res.error){
+    if(box)box.innerHTML='<div style="padding:8px;color:var(--red);font-size:11px">Ошибка загрузки событий: '+res.error+'</div>';
+    toast('Ошибка: '+res.error,'err');
+    return;
+  }
   adminEvents[mid]=Array.isArray(res)?res:[];
   renderAdminEvents(mid);
 }
