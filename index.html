@@ -714,13 +714,30 @@ function showApp(){
 }
 
 async function loadAll(){
-  const[matchRes,predRes,lbRes]=await Promise.all([sbGet('matches','?select=*&order=id'),sbGet('predictions','?user_id=eq.'+uid+'&select=*'),sbGet('leaderboard','?select=*')]);
+  const[matchRes,predRes,lbRes,evRes,epRes]=await Promise.all([
+    sbGet('matches','?select=*&order=id'),
+    sbGet('predictions','?user_id=eq.'+uid+'&select=*'),
+    sbGet('leaderboard','?select=*'),
+    sbGet('match_events','?select=*&order=sort_order'),
+    sbGet('event_predictions','?user_id=eq.'+uid+'&select=*')
+  ]);
   if(matchRes?.error || predRes?.error || lbRes?.error){
     toast('⚠️ Проблема с соединением, потяни вниз чтобы обновить','err');
   }
   matches=Array.isArray(matchRes)?matchRes:[];
   preds={};(Array.isArray(predRes)?predRes:[]).forEach(p=>preds[p.match_id]=p);
   lb=Array.isArray(lbRes)?lbRes:[];
+  // События всех матчей: группируем по match_id
+  matchEvents={};
+  (Array.isArray(evRes)?evRes:[]).forEach(ev=>{
+    if(!matchEvents[ev.match_id])matchEvents[ev.match_id]=[];
+    matchEvents[ev.match_id].push(ev);
+  });
+  // Свои ставки на события
+  eventPicks={};
+  (Array.isArray(epRes)?epRes:[]).forEach(ep=>{
+    eventPicks[ep.event_id]={answer:ep.answer,is_boost:ep.is_boost,points:ep.points};
+  });
   updateScore(lb);buildFilters();renderMatches();renderHistory();try{renderLB(lb);}catch(e){console.error('renderLB',e);}
   if(ADMIN_IDS.includes(uid))loadAdminStats();
   lbLoaded=true;statsLoaded=false;
@@ -1067,6 +1084,7 @@ async function saveEvents(mid){
   if(btn){btn.textContent='✓ Сохранить ставки';btn.disabled=false;}
   if(errors===0)toast('✅ Ставки сохранены ('+saved+')','ok');
   rerenderCard(mid);
+  renderHistory();
 }
 
 function toggleX2(mid){
@@ -1119,8 +1137,40 @@ function setHistTab(tab){
   renderHistory();
 }
 
+function evAnswerLabel(ev,m,ans){
+  if(ev.kind==='binary')return ans==='yes'?'Да':'Нет';
+  const map={team1:m.team1||'К1',draw:'Ничья',team2:m.team2||'К2'};
+  return map[ans]||ans;
+}
+
+function buildHistEventRows(m){
+  const evs=matchEvents[m.id]||[];
+  const mine=evs.filter(ev=>eventPicks[ev.id]&&eventPicks[ev.id].answer);
+  if(!mine.length)return'';
+  return'<div style="padding:4px 14px 10px">'+mine.map(ev=>{
+    const pk=eventPicks[ev.id];
+    const pts=pk.points!=null?Number(pk.points):null;
+    const ptsStr=pts!=null?'<span style="font-weight:800;color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'<span style="color:var(--muted)">⏳</span>';
+    return'<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:11px;border-bottom:1px solid var(--border)">'+
+      '<span style="flex:1;color:var(--text)">'+ev.label+'</span>'+
+      '<span style="font-weight:700;color:var(--teal)">'+evAnswerLabel(ev,m,pk.answer)+'</span>'+
+      (pk.is_boost?'<span style="color:#c084fc">⚡</span>':'')+
+      ptsStr+
+      '</div>';
+  }).join('')+'</div>';
+}
+
 function buildHistCard_pending(m){
-  const p=preds[m.id],now=new Date(),locked=now>new Date(m.deadline);
+  const now=new Date(),locked=now>new Date(m.deadline);
+  const isKn=m.type==='match'&&!getGroup(m);
+  if(isKn){
+    return'<div class="hist-card pending">'+
+      '<div class="hist-header"><div class="hist-title">'+m.team1+' — '+m.team2+'</div>'+
+      '<div class="hist-time">'+(locked?'🔒':'📅 '+fmtTime(m.deadline))+'</div></div>'+
+      buildHistEventRows(m)+
+      '</div>';
+  }
+  const p=preds[m.id];
   return'<div class="hist-card pending">'+
     '<div class="hist-header"><div class="hist-title">'+(m.type==='match'?m.team1+' — '+m.team2:m.title)+'</div>'+
     '<div class="hist-time">'+(locked?'🔒':'📅 '+fmtTime(m.deadline))+'</div></div>'+
@@ -1129,6 +1179,18 @@ function buildHistCard_pending(m){
 }
 
 function buildHistCard_done(m){
+  const isKn=m.type==='match'&&!getGroup(m);
+  if(isKn){
+    // Сумма моих очков по событиям матча
+    const evs=matchEvents[m.id]||[];
+    let total=0,anyPts=false;
+    evs.forEach(ev=>{const pk=eventPicks[ev.id];if(pk&&pk.points!=null){total+=Number(pk.points);anyPts=true;}});
+    const totStr=anyPts?'<div class="pts '+(total>0?'pos':total<0?'neg':'')+'">'+(total>0?'+':'')+total+' pts</div>':'<div class="pts wait">—</div>';
+    return'<div class="hist-card" id="hcard-'+m.id+'">'+
+      '<div class="hist-header"><div class="hist-title">'+m.team1+' — '+m.team2+'</div>'+totStr+'</div>'+
+      buildHistEventRows(m)+
+      '</div>';
+  }
   const p=preds[m.id],pts=p?Number(p.points):null;
   const ph=p&&p.points!=null?'<div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'">'+(pts>0?'+':'')+pts+' pts</div>':'<div class="pts wait">—</div>';
   let othersHtml='';
@@ -1152,17 +1214,38 @@ function buildHistCard_done(m){
     othersHtml+'</div>';
 }
 
+// Есть ли у меня ставки на события этого матча
+function myEventBets(mid){
+  const evs=matchEvents[mid]||[];
+  return evs.filter(ev=>eventPicks[ev.id]&&eventPicks[ev.id].answer);
+}
+// Все ли события матча рассчитаны (для определения "завершён")
+function allEventsScored(mid){
+  const evs=matchEvents[mid]||[];
+  if(!evs.length)return false;
+  return evs.every(ev=>ev.result!=null&&ev.result!=='');
+}
+
 function renderHistory(){
   const el=document.getElementById('hist-list');
   const now=new Date();
   const type=activeHistTab==='matches'?'match':'special';
 
-  // Завершённые (с результатом) для текущей вкладки
-  const fin=matches.filter(m=>m.type===type&&m.result)
-    .sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
-  // Ожидают (прогноз есть, результата нет)
-  const pending=matches.filter(m=>m.type===type&&!m.result&&preds[m.id])
-    .sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+  const isKn=m=>m.type==='match'&&!getGroup(m);
+
+  // Завершённые: обычные с результатом ИЛИ плей-офф где все события рассчитаны (и есть мои ставки)
+  const fin=matches.filter(m=>{
+    if(m.type!==type)return false;
+    if(isKn(m))return myEventBets(m.id).length>0&&allEventsScored(m.id);
+    return !!m.result;
+  }).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
+
+  // Ожидают: обычные с прогнозом без результата ИЛИ плей-офф с моими ставками где не всё рассчитано
+  const pending=matches.filter(m=>{
+    if(m.type!==type)return false;
+    if(isKn(m))return myEventBets(m.id).length>0&&!allEventsScored(m.id);
+    return !m.result&&preds[m.id];
+  }).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
 
   if(!fin.length&&!pending.length){
     el.innerHTML='<div class="empty"><div class="empty-ic">📋</div><div>'+(activeHistTab==='matches'?'Нет матчей с прогнозами':'Нет событий с прогнозами')+'</div></div>';
@@ -1396,6 +1479,46 @@ async function deleteUser(userId){
   else{toast('✅ Игрок удалён','ok');await loadAll();loadAdminUsers();}
 }
 
+// ── АДМИН: попап со ставками игроков на события плей-офф матча ────────────────
+async function showEventPreds(mid){
+  const m=matches.find(x=>x.id==mid);
+  const title=m?(m.team1+' vs '+m.team2):'Матч '+mid;
+  // Загружаем события матча и ВСЕ ставки на них с именами
+  const evRes=await sbGet('match_events','?match_id=eq.'+mid+'&select=*&order=sort_order');
+  if(!Array.isArray(evRes)||!evRes.length){toast('У матча нет событий','err');return;}
+  const ids=evRes.map(e=>e.id).join(',');
+  const epRes=await sbGet('event_predictions','?event_id=in.('+ids+')&select=*,users(name)');
+  const allPreds=Array.isArray(epRes)?epRes:[];
+
+  const evBlocks=evRes.map(ev=>{
+    const evPreds=allPreds.filter(p=>p.event_id===ev.id);
+    const rows=evPreds.length?evPreds.map(p=>{
+      const nm=p.users?.name||p.user_id;
+      const ansLbl=evAnswerLabel(ev,m,p.answer);
+      const pts=p.points!=null?Number(p.points):null;
+      const ptsStr=pts!=null?'<span style="font-weight:800;color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'<span style="color:var(--muted)">⏳</span>';
+      return'<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">'+
+        '<span style="flex:1;color:var(--muted)">'+nm+'</span>'+
+        '<span style="font-weight:700;color:var(--teal)">'+ansLbl+'</span>'+
+        (p.is_boost?'<span style="color:#c084fc">⚡</span>':'')+
+        ptsStr+'</div>';
+    }).join(''):'<div style="font-size:10px;color:var(--muted);padding:3px 0">Нет ставок</div>';
+    const resStr=ev.result?' <span style="color:var(--green);font-size:10px">✅ '+evAnswerLabel(ev,m,ev.result)+'</span>':'';
+    return'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--text)">'+ev.label+resStr+'</div>'+rows+'</div>';
+  }).join('');
+
+  const bg=document.createElement('div');bg.className='pred-popup-bg';
+  bg.innerHTML='<div class="pred-popup">'+
+    '<div class="pred-popup-title">📋 '+title+'</div>'+
+    evBlocks+
+    '<button class="modal-close" id="close-epp">Закрыть</button>'+
+    '</div>';
+  bg.querySelector('#close-epp').onclick=()=>bg.remove();
+  bg.onclick=e=>{if(e.target===bg)bg.remove();};
+  document.body.appendChild(bg);
+}
+
 async function showMatchPreds(mid){
   const m=matches.find(x=>x.id==mid);const title=m?m.title:'Матч '+mid;
   const isSpecial=m?.type==='special';
@@ -1508,7 +1631,7 @@ function buildAdminCard(m){
       if(isKnockoutAdmin){
         return commonHead+
           '<div id="adm-events-'+m.id+'" class="adm-events">'+
-          '<div style="text-align:center;padding:8px"><button class="admin-btn grey sm" onclick="loadAdminEvents('+m.id+')">📋 Показать события</button></div>'+
+          '<div style="text-align:center;padding:8px;display:flex;gap:6px;justify-content:center"><button class="admin-btn grey sm" onclick="loadAdminEvents('+m.id+')">📋 Показать события</button><button class="admin-btn grey sm" onclick="showEventPreds('+m.id+')">👁 Ставки игроков</button></div>'+
           '</div>'+
           '</div>';
       }
