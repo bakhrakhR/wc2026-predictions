@@ -206,6 +206,11 @@ body{font-family:'Bricolage Grotesque',Arial,sans-serif;background:var(--bg);col
 .add-row{display:flex;gap:6px;margin-bottom:6px;}
 .add-input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--text);outline:none;font-family:'Bricolage Grotesque',Arial,sans-serif;}
 select.add-input{cursor:pointer;}
+.collapse-head{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;cursor:pointer;margin-bottom:8px;font-size:13px;font-weight:800;color:var(--text);user-select:none;}
+.collapse-head .arr{transition:transform 0.2s;font-size:12px;color:var(--muted);}
+.collapse-head.open .arr{transform:rotate(180deg);}
+.collapse-body{display:none;margin-bottom:12px;}
+.collapse-body.open{display:block;}
 .section-label{font-size:13px;font-weight:800;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:0.5px;}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border);}
 
@@ -401,51 +406,69 @@ select.add-input{cursor:pointer;}
 
   <div class="page" id="page-admin">
     <div class="admin-stat-row" id="admin-stats-row" style="margin-top:4px"></div>
-    <div class="admin-danger-box">
-      <div class="admin-danger-title">⚠️ Управление данными</div>
-      <div class="add-row">
-        <button class="admin-btn danger" onclick="clearAllPreds()">🗑️ Сбросить ВСЕ прогнозы</button>
-        <button class="admin-btn danger sm" onclick="clearMyPreds()">Мои</button>
+
+    <div class="collapse-head" onclick="toggleCollapse('sec-tools',this)"><span>🛠️ Инструменты</span><span class="arr">▼</span></div>
+    <div class="collapse-body" id="sec-tools">
+      <div class="admin-danger-box">
+        <div class="admin-danger-title">⚠️ Управление данными</div>
+        <div class="add-row">
+          <button class="admin-btn danger" onclick="clearAllPreds()">🗑️ Сбросить ВСЕ прогнозы</button>
+          <button class="admin-btn danger sm" onclick="clearMyPreds()">Мои</button>
+        </div>
+      </div>
+      <div class="import-box">
+        <div class="import-title">🌐 Импорт матчей ЧМ 2026</div>
+        <div class="import-sub">Запрос идёт через Apps Script (обходит CORS football-data.org)</div>
+        <input class="api-input" id="api-key" type="text" placeholder="API-ключ football-data.org...">
+        <button class="import-btn" onclick="importMatches()">⚡ Импортировать матчи</button>
+      </div>
+      <div class="add-box">
+        <div class="add-title">🔀 Слить дублирующиеся аккаунты</div>
+        <div class="import-sub" style="margin-bottom:8px">Если у игрока появился временный профиль (test_XXXX) — перенеси его прогнозы на основной ID и удали дубль</div>
+        <div class="add-row">
+          <input class="add-input" id="merge-from" type="text" placeholder="Откуда (напр. test_6585)">
+          <input class="add-input" id="merge-to" type="text" placeholder="Куда (напр. 786072422)">
+        </div>
+        <button class="admin-btn" onclick="mergeUsers()" style="width:100%">Слить аккаунты</button>
       </div>
     </div>
-    <div class="import-box">
-      <div class="import-title">🌐 Импорт матчей ЧМ 2026</div>
-      <div class="import-sub">Запрос идёт через Apps Script (обходит CORS football-data.org)</div>
-      <input class="api-input" id="api-key" type="text" placeholder="API-ключ football-data.org...">
-      <button class="import-btn" onclick="importMatches()">⚡ Импортировать матчи</button>
+
+    <div class="collapse-head" onclick="toggleCollapse('sec-add',this)"><span>➕ Добавить событие / матч</span><span class="arr">▼</span></div>
+    <div class="collapse-body" id="sec-add">
+      <div class="add-box">
+        <div class="add-row">
+          <input class="add-input" id="ev-title" type="text" placeholder="Название события">
+          <select class="add-input" id="ev-type" style="max-width:100px" onchange="toggleTeams()">
+            <option value="special">🌟 Событие</option>
+            <option value="match">⚽ Матч</option>
+          </select>
+        </div>
+        <div class="add-row" id="ev-teams" style="display:none">
+          <input class="add-input" id="ev-t1" type="text" placeholder="Команда 1">
+          <input class="add-input" id="ev-t2" type="text" placeholder="Команда 2">
+        </div>
+        <div class="add-row">
+          <input class="add-input" id="ev-dl" type="datetime-local">
+          <input class="add-input" id="ev-pts" type="number" placeholder="Очки" style="max-width:70px" value="2">
+        </div>
+        <button class="admin-btn" onclick="addEvent()" style="width:100%;margin-top:4px">Добавить событие</button>
+      </div>
     </div>
-    <div class="add-box">
-      <div class="add-title">➕ Добавить своё событие</div>
-      <div class="add-row">
-        <input class="add-input" id="ev-title" type="text" placeholder="Название события">
-        <select class="add-input" id="ev-type" style="max-width:100px" onchange="toggleTeams()">
-          <option value="special">🌟 Событие</option>
-          <option value="match">⚽ Матч</option>
-        </select>
-      </div>
-      <div class="add-row" id="ev-teams" style="display:none">
-        <input class="add-input" id="ev-t1" type="text" placeholder="Команда 1">
-        <input class="add-input" id="ev-t2" type="text" placeholder="Команда 2">
-      </div>
-      <div class="add-row">
-        <input class="add-input" id="ev-dl" type="datetime-local">
-        <input class="add-input" id="ev-pts" type="number" placeholder="Очки" style="max-width:70px" value="2">
-      </div>
-      <button class="admin-btn" onclick="addEvent()" style="width:100%;margin-top:4px">Добавить событие</button>
+
+    <div class="collapse-head" onclick="toggleCollapse('sec-users',this)"><span>👥 Игроки</span><span class="arr">▼</span></div>
+    <div class="collapse-body" id="sec-users">
+      <div id="admin-users"><div class="loader"><div class="spin"></div></div></div>
     </div>
-    <div class="section-label">👥 Игроки</div>
-    <div class="add-box">
-      <div class="add-title">🔀 Слить дублирующиеся аккаунты</div>
-      <div class="import-sub" style="margin-bottom:8px">Если у игрока появился временный профиль (test_XXXX) — перенеси его прогнозы на основной ID и удали дубль</div>
-      <div class="add-row">
-        <input class="add-input" id="merge-from" type="text" placeholder="Откуда (напр. test_6585)">
-        <input class="add-input" id="merge-to" type="text" placeholder="Куда (напр. 786072422)">
-      </div>
-      <button class="admin-btn" onclick="mergeUsers()" style="width:100%">Слить аккаунты</button>
+
+    <div class="collapse-head open" onclick="toggleCollapse('sec-active',this)"><span>🎯 Активные (без результата)</span><span class="arr">▼</span></div>
+    <div class="collapse-body open" id="sec-active">
+      <div id="admin-list-active"><div class="loader"><div class="spin"></div></div></div>
     </div>
-    <div id="admin-users" style="margin-bottom:14px"><div class="loader"><div class="spin"></div></div></div>
-    <div class="section-label">Результаты</div>
-    <div id="admin-list"><div class="loader"><div class="spin"></div></div></div>
+
+    <div class="collapse-head" onclick="toggleCollapse('sec-done',this)"><span>✅ Завершённые</span><span class="arr">▼</span></div>
+    <div class="collapse-body" id="sec-done">
+      <div id="admin-list-done"><div class="loader"><div class="spin"></div></div></div>
+    </div>
   </div>
 </div>
 
@@ -698,13 +721,16 @@ async function loadAll(){
   matches=Array.isArray(matchRes)?matchRes:[];
   preds={};(Array.isArray(predRes)?predRes:[]).forEach(p=>preds[p.match_id]=p);
   lb=Array.isArray(lbRes)?lbRes:[];
-  buildFilters();renderMatches();renderHistory();renderLB(lb);updateScore(lb);
+  updateScore(lb);buildFilters();renderMatches();renderHistory();try{renderLB(lb);}catch(e){console.error('renderLB',e);}
   if(ADMIN_IDS.includes(uid))loadAdminStats();
   lbLoaded=true;statsLoaded=false;
 }
 function updateScore(l){
-  const me=l.find(r=>r.user_id===uid);const pts=me?Math.round(Number(me.points)*10)/10:0;
-  document.getElementById('uscore').textContent=(pts>0?'+':'')+pts;
+  if(!Array.isArray(l)||!uid)return;
+  const me=l.find(r=>String(r.user_id)===String(uid));
+  const pts=me?Math.round(Number(me.points)*10)/10:0;
+  const el=document.getElementById('uscore');
+  if(el)el.textContent=(pts>0?'+':'')+pts;
 }
 function openRules(){document.getElementById('rules-modal').style.display='flex';}
 function closeRules(){document.getElementById('rules-modal').style.display='none';}
@@ -924,14 +950,15 @@ function buildEventRow(ev,m,locked,boostUsed){
   const hasResult=ev.result!=null&&ev.result!=='';
   const boostDisabled=locked||(pick?.is_boost?false:boostUsed>=3);
 
-  if(ev.kind==='outcome'){
+  if(ev.kind==='outcome'||ev.kind==='advance'){
+    const isAdvance=ev.kind==='advance';
     const ans=pick?.answer||'';
     const o1=ans==='team1'?'out-active':'';
     const od=ans==='draw'?'out-active':'';
     const o2=ans==='team2'?'out-active':'';
     let resLine='';
     if(hasResult){
-      const rmap={team1:'П1',draw:'Ничья',team2:'П2'};
+      const rmap=isAdvance?{team1:m.team1,team2:m.team2}:{team1:'П1',draw:'Ничья',team2:'П2'};
       const pts=pick?.points;
       const ptsStr=pts!=null?' <span style="color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'';
       resLine='<span class="mev-res">Итог: '+(rmap[ev.result]||ev.result)+ptsStr+'</span>';
@@ -939,9 +966,9 @@ function buildEventRow(ev,m,locked,boostUsed){
     return'<div class="mev-outcome">'+
       '<div class="mev-outcome-label">'+ev.label+(pick?.is_boost?' <span style="color:#c084fc">⚡</span>':'')+resLine+'</div>'+
       '<div class="mev-outcome-btns">'+
-      '<button class="mev-out-btn '+o1+'" onclick="pickOutcome('+ev.id+',\'team1\','+m.id+')"'+(locked?' disabled':'')+'>П1<br>'+m.team1+'</button>'+
-      '<button class="mev-out-btn '+od+'" onclick="pickOutcome('+ev.id+',\'draw\','+m.id+')"'+(locked?' disabled':'')+'>Ничья</button>'+
-      '<button class="mev-out-btn '+o2+'" onclick="pickOutcome('+ev.id+',\'team2\','+m.id+')"'+(locked?' disabled':'')+'>П2<br>'+m.team2+'</button>'+
+      '<button class="mev-out-btn '+o1+'" onclick="pickOutcome('+ev.id+',\'team1\','+m.id+')"'+(locked?' disabled':'')+'>'+m.team1+'</button>'+
+      (isAdvance?'':'<button class="mev-out-btn '+od+'" onclick="pickOutcome('+ev.id+',\'draw\','+m.id+')"'+(locked?' disabled':'')+'>Ничья</button>')+
+      '<button class="mev-out-btn '+o2+'" onclick="pickOutcome('+ev.id+',\'team2\','+m.id+')"'+(locked?' disabled':'')+'>'+m.team2+'</button>'+
       '<button class="mev-boost '+(pick?.is_boost?'boost-active':'')+'" onclick="toggleBoost('+ev.id+','+m.id+')"'+(boostDisabled?' disabled':'')+'>⚡</button>'+
       '</div></div>';
   }
@@ -1196,9 +1223,10 @@ function renderLB(l){
     const pCls={1:'p1',2:'p2',3:'p3'};
     podEl.innerHTML='<div class="podium">'+displayOrder.map((p,i)=>{
       const rank=displayRanks[i];
-      const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      const nm=p.name||'?';
+      const ini=nm.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase()||'?';
       const pts=Math.round(Number(p.points)*10)/10;
-      const isMe=p.user_id===uid;
+      const isMe=String(p.user_id)===String(uid);
       return'<div class="podium-item">'+
         (rank===1?'<div style="font-size:18px;margin-bottom:2px">👑</div>':'')+
         '<div class="podium-avatar '+avCls[rank]+'" style="'+(isMe?'box-shadow:0 0 0 3px white':'')+'">'+(isMe?'👤':ini)+'</div>'+
@@ -1212,8 +1240,9 @@ function renderLB(l){
   }
   // Полный список всех игроков
   listEl.innerHTML=l.map((p,i)=>{
-    const isMe=p.user_id===uid;
-    const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    const isMe=String(p.user_id)===String(uid);
+    const nm=p.name||'?';
+    const ini=nm.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase()||'?';
     const pts=Math.round(Number(p.points)*10)/10;
     const medals=['🥇','🥈','🥉'];
     return'<div class="lb-row '+(isMe?'me':'')+'">'+
@@ -1428,18 +1457,31 @@ async function manualAccept(predId, pts, btn){
   if(Array.isArray(lbRes)){lb=lbRes;renderLB(lb);updateScore(lb);}
 }
 
+function toggleCollapse(id,head){
+  const body=document.getElementById(id);
+  if(!body)return;
+  const isOpen=body.classList.contains('open');
+  body.classList.toggle('open',!isOpen);
+  head.classList.toggle('open',!isOpen);
+}
+
 function renderAdminList(){
-  const el=document.getElementById('admin-list');
-  if(!matches.length){el.innerHTML='<div class="empty"><div>Матчей пока нет</div></div>';return;}
-  // Сортировка: сначала события без результата, потом матчи без результата, в конце — рассчитанные
+  const elA=document.getElementById('admin-list-active');
+  const elD=document.getElementById('admin-list-done');
+  if(!elA||!elD)return;
+  if(!matches.length){elA.innerHTML='<div class="empty"><div>Матчей пока нет</div></div>';elD.innerHTML='';return;}
   const withoutResult=matches.filter(m=>!m.result);
-  const withResult=matches.filter(m=>m.result);
-  const sorted=[
+  const withResult=matches.filter(m=>m.result).sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
+  const sortedActive=[
     ...withoutResult.filter(m=>m.type==='special').sort((a,b)=>new Date(a.deadline)-new Date(b.deadline)),
-    ...withoutResult.filter(m=>m.type!=='special').sort((a,b)=>new Date(a.deadline)-new Date(b.deadline)),
-    ...withResult.sort((a,b)=>new Date(b.deadline)-new Date(a.deadline))
+    ...withoutResult.filter(m=>m.type!=='special').sort((a,b)=>new Date(a.deadline)-new Date(b.deadline))
   ];
-  el.innerHTML=sorted.map(m=>{
+  elA.innerHTML=sortedActive.length?sortedActive.map(buildAdminCard).join(''):'<div class="empty" style="padding:10px">Всё рассчитано ✅</div>';
+  elD.innerHTML=withResult.length?withResult.map(buildAdminCard).join(''):'<div class="empty" style="padding:10px">Пока нет завершённых</div>';
+}
+
+function buildAdminCard(m){
+  {
     try{
       const pts=m.custom_points?'(+'+m.custom_points+' pts)':'';
       const dlStr=m.deadline?fmtTime(m.deadline):'?';
@@ -1486,7 +1528,7 @@ function renderAdminList(){
       console.error('Admin card error for match',m.id,e.message);
       return'<div class="admin-card"><div class="admin-title">⚠️ '+(m.title||'Матч '+m.id)+'</div><div style="color:var(--red);font-size:11px">Ошибка: '+e.message+'</div></div>';
     }
-  }).join('');
+  }
 }
 // Нормализация счёта: "1 1", "1-1" → "1:1"; "1 1|Spain" → "1:1|Spain"
 function normalizeScore(s){
@@ -1542,11 +1584,12 @@ function renderAdminEvents(mid){
     evs.map(ev=>{
       const hasRes=ev.result!=null&&ev.result!=='';
       let controls;
-      if(ev.kind==='outcome'){
+      if(ev.kind==='outcome'||ev.kind==='advance'){
+        const isAdv=ev.kind==='advance';
         controls='<div style="display:flex;gap:4px;margin-top:4px">'+
-          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'team1\','+mid+')" '+(ev.result==='team1'?'style="background:var(--teal);color:#0a1a18"':'')+'>П1</button>'+
-          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'draw\','+mid+')" '+(ev.result==='draw'?'style="background:var(--teal);color:#0a1a18"':'')+'>Ничья</button>'+
-          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'team2\','+mid+')" '+(ev.result==='team2'?'style="background:var(--teal);color:#0a1a18"':'')+'>П2</button>'+
+          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'team1\','+mid+')" '+(ev.result==='team1'?'style="background:var(--teal);color:#0a1a18"':'')+'>'+(isAdv?t1:'П1')+'</button>'+
+          (isAdv?'':'<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'draw\','+mid+')" '+(ev.result==='draw'?'style="background:var(--teal);color:#0a1a18"':'')+'>Ничья</button>')+
+          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'team2\','+mid+')" '+(ev.result==='team2'?'style="background:var(--teal);color:#0a1a18"':'')+'>'+(isAdv?t2:'П2')+'</button>'+
           '</div>';
       } else {
         controls='<div style="display:flex;gap:4px;margin-top:4px">'+
