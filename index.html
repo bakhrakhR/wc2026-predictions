@@ -251,6 +251,26 @@ select.add-input{cursor:pointer;}
 .pred-row .pr-x2{background:var(--red);color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;}
 .pred-row .pr-pts{font-weight:800;min-width:40px;text-align:right;}
 .pred-row .pr-pts.pos{color:var(--green);}.pred-row .pr-pts.neg{color:var(--red);}.pred-row .pr-pts.wait{color:var(--muted);}
+/* ── MATCH EVENTS (плей-офф) ── */
+.mev-list{padding:6px 14px 4px;border-top:1px solid var(--border);}
+.mev-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
+.mev-row:last-child{border-bottom:none;}
+.mev-label{flex:1;font-size:12px;font-weight:600;color:var(--text);line-height:1.3;}
+.mev-label .mev-res{font-size:10px;color:var(--green);font-weight:700;display:block;margin-top:2px;}
+.mev-toggle{display:flex;gap:3px;flex-shrink:0;}
+.mev-btn{background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:6px 11px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:11px;font-weight:800;color:var(--muted);cursor:pointer;transition:all 0.15s;min-width:38px;}
+.mev-btn.yes-active{background:var(--green);border-color:var(--green);color:#0a1a0a;}
+.mev-btn.no-active{background:var(--red);border-color:var(--red);color:#1a0808;}
+.mev-boost{background:transparent;border:1.5px solid #6b21a8;border-radius:8px;padding:6px 8px;font-size:13px;cursor:pointer;flex-shrink:0;transition:all 0.15s;line-height:1;}
+.mev-boost.boost-active{background:#a855f7;border-color:#a855f7;box-shadow:0 0 8px #a855f766;}
+.mev-boost:disabled{opacity:0.3;cursor:not-allowed;}
+.mev-outcome{padding:9px 0;border-bottom:1px solid var(--border);}
+.mev-outcome-label{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.mev-outcome-btns{display:flex;gap:4px;align-items:stretch;}
+.mev-out-btn{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:8px 4px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:10px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.15s;text-align:center;line-height:1.2;}
+.mev-out-btn.out-active{background:var(--teal);border-color:var(--teal);color:#0a1a18;}
+.mev-boost-summary{font-size:10px;color:#c084fc;font-weight:700;text-align:right;padding:6px 14px 0;}
+.mev-rules{font-size:10px;color:var(--muted);padding:4px 14px 8px;line-height:1.5;}
 /* ── WINNER PICK ── */
 .winner-pick{padding:10px 14px 6px;border-top:1px solid var(--border);background:#0f1e10;}
 .winner-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;text-align:center;}
@@ -439,6 +459,12 @@ const AS_URL='https://script.google.com/macros/s/AKfycbyLJ-efaVw_W-MgDVJJgaPhPqn
 const ADMIN_IDS=['349513510'];
 const BOT_USERNAME='Kubikpresa_bot';
 
+// ── РЕЖИМ ОБСЛУЖИВАНИЯ ────────────────────────────────────────────────────────
+// true = все кроме админа видят заглушку (для тестирования)
+// false = обычная работа для всех
+// Переключи на false и перезалей index.html когда тестирование закончено.
+const MAINTENANCE_MODE=true;
+
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 // fetchT — fetch с таймаутом. Без него зависшие запросы (частый эффект нестабильной
 // сети через VPN) могут "висеть" бесконечно — async/await просто никогда не завершится,
@@ -493,7 +519,7 @@ function fmtDL(d){
   if(h<24)return{text:'⏰ '+Math.floor(h)+' ч',cls:'soon'};
   return{text:fmtTime(d),cls:''};
 }
-function getGroup(m){if(m.type==='special')return null;const r=m.title.match(/Group ([A-L])/i);return r?r[1].toUpperCase():null;}
+function getGroup(m){if(m.type==='special')return null;const r=(m.title||'').match(/Group ([A-L])/i);return r?r[1].toUpperCase():null;}
 const FLAG_CODES={'Mexico':'mx','South Africa':'za','South Korea':'kr','Czechia':'cz','Czech Republic':'cz',
   'Argentina':'ar','France':'fr','Brazil':'br','Germany':'de','Spain':'es','Portugal':'pt',
   'England':'gb-eng','Netherlands':'nl','Belgium':'be','Croatia':'hr','Morocco':'ma',
@@ -532,7 +558,8 @@ function mkTeamAvatar(name,color){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let tg; // будет установлен после загрузки telegram-web-app.js (см. initTelegram)
 let uid,uname,matches=[],preds={},lb=[],matchPreds={};
-let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',activeHistTab='matches',saving={},clearing={},winnerPicks={};
+let matchEvents={},eventPreds={},eventPicks={};
+let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',activeHistTab='matches',saving={},clearing={};
 let lbLoaded=false,statsLoaded=false;
 
 // x2 — один матч в день
@@ -606,8 +633,19 @@ window.addEventListener('load',async()=>{
   }
   if(ADMIN_IDS.includes(uid))document.getElementById('admin-tab').style.display='block';
   document.getElementById('init-loading').style.display='none'; // убираем экран загрузки
+  // Режим обслуживания: все кроме админа видят заглушку
+  if(MAINTENANCE_MODE&&!ADMIN_IDS.includes(uid)){showMaintenance();return;}
   await checkReg();
 });
+
+function showMaintenance(){
+  document.body.innerHTML='<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;background:#132013;color:#f0f4f0;font-family:\'Bricolage Grotesque\',Arial,sans-serif">'+
+    '<div style="font-size:56px;margin-bottom:20px">🔧</div>'+
+    '<div style="font-size:22px;font-weight:800;margin-bottom:12px;color:#f0b429">Идут технические работы</div>'+
+    '<div style="font-size:15px;color:#a8b8a8;line-height:1.5;max-width:300px">Обновляем игру к плей-офф. Скоро вернёмся — попробуй зайти чуть позже!</div>'+
+    '<div style="font-size:36px;margin-top:28px">🐙</div>'+
+    '</div>';
+}
 
 function showConnectionWarning(){
   const w=document.createElement('div');
@@ -762,25 +800,22 @@ function renderMatches(){
 
 function buildCard(m){
   const now=new Date(),locked=now>new Date(m.deadline),p=preds[m.id],hasRes=!!m.result;
-  const{text:dlTxt,cls:dlCls}=fmtDL(m.deadline);const isX2=p?.is_x2;
+  const{text:dlTxt,cls:dlCls}=fmtDL(m.deadline);
   const grp=getGroup(m);
-  const isKnockout=m.type==='match'&&!grp; // плей-офф = матч без группы
+  const isKnockout=m.type==='match'&&!grp;
 
+  // ПЛЕЙ-ОФФ МАТЧ → рендерим события вместо счёта
+  if(isKnockout){
+    return buildKnockoutCard(m,locked,dlTxt,dlCls);
+  }
+
+  const isX2=p?.is_x2;
   let body='';
   if(m.type==='match'){
-    // Парсим прогноз: "1:1|Spain" → scorePart="1:1", storedWinner="Spain"
     const rawPred=(p&&p.prediction!=null)?p.prediction:'';
     const scorePart0=rawPred.includes('|')?rawPred.split('|')[0]:rawPred;
-    const storedWinner=rawPred.includes('|')?rawPred.split('|').slice(1).join('|'):'';
     const parts=scorePart0?scorePart0.split(':'):['',''];
-
-    // Синхронизируем winnerPicks из сохранённого прогноза
-    if(storedWinner&&winnerPicks[m.id]===undefined)winnerPicks[m.id]=storedWinner;
-    const curWinner=winnerPicks[m.id]||'';
-
     const c1=teamColor(m.team1),c2=teamColor(m.team2);
-
-    // Liga bar
     let ligaHtml='';
     if(matchPreds[m.id]&&matchPreds[m.id].length>0){
       const all=matchPreds[m.id];const tot=all.length;
@@ -788,60 +823,36 @@ function buildCard(m){
       const pct1=Math.round(h1/tot*100);const pct2=100-pct1;
       ligaHtml='<div class="liga-bar-wrap"><div class="liga-label"><span class="pct1">'+pct1+'%</span><span class="liga-txt">лига ставит</span><span class="pct2">'+pct2+'%</span></div><div class="liga-bar"><div class="liga-bar-fill1" style="width:'+pct1+'%"></div><div class="liga-bar-fill2"></div></div></div>';
     }
-
-    // Определяем начальное состояние ничьей для winner picker
     const s1Init=parts[0]||'',s2Init=parts[1]||'';
-    const isInitDraw=s1Init!==''&&s2Init!==''&&s1Init===s2Init;
-    const showPicker=isKnockout&&!locked&&isInitDraw;
-
-    // Winner picker (только плей-офф, только если не заблокировано)
-    const w1cls=curWinner&&curWinner.toLowerCase()===m.team1.toLowerCase()?'winner-selected':(curWinner?'winner-unselected':'');
-    const w2cls=curWinner&&curWinner.toLowerCase()===m.team2.toLowerCase()?'winner-selected':(curWinner?'winner-unselected':'');
-    const winnerPickerHtml=isKnockout&&!locked?
-      '<div class="winner-pick" id="winner-pick-'+m.id+'" style="display:'+(showPicker?'block':'none')+'">'+
-      '<div class="winner-label">Кто пройдёт дальше? (+3 pts)</div>'+
-      '<div class="winner-flags">'+
-      '<button class="winner-flag '+w1cls+'" data-team="'+m.team1.replace(/"/g,'&quot;')+'" onclick="pickWinner('+m.id+',this)"'+(locked?' disabled':'')+'>'+
-        mkTeamAvatar(m.team1,c1)+'<span>'+m.team1+'</span></button>'+
-      '<button class="winner-flag '+w2cls+'" data-team="'+m.team2.replace(/"/g,'&quot;')+'" onclick="pickWinner('+m.id+',this)"'+(locked?' disabled':'')+'>'+
-        mkTeamAvatar(m.team2,c2)+'<span>'+m.team2+'</span></button>'+
-      '</div>'+
-      '<div class="winner-hint">⚡ x2 не влияет на этот бонус</div>'+
-      '</div>':
-      '';
-
     body='<div class="score-row">'+
       '<div class="team-block">'+mkTeamAvatar(m.team1,c1)+
       '<div class="team-name">'+m.team1+'</div>'+
-      '<div class="score-inputs"><input class="score-box" id="s1-'+m.id+'" type="number" min="0" max="99" value="'+s1Init+'" placeholder="—"'+(locked?' disabled':'')+' oninput="checkDrawState('+m.id+')">'+
+      '<div class="score-inputs"><input class="score-box" id="s1-'+m.id+'" type="number" min="0" max="99" value="'+s1Init+'" placeholder="—"'+(locked?' disabled':'')+'>'+
       '</div></div>'+
       '<div class="score-sep" style="padding:0 4px 18px">—</div>'+
       '<div class="team-block">'+mkTeamAvatar(m.team2,c2)+
       '<div class="team-name">'+m.team2+'</div>'+
-      '<div class="score-inputs"><input class="score-box" id="s2-'+m.id+'" type="number" min="0" max="99" value="'+s2Init+'" placeholder="—"'+(locked?' disabled':'')+' oninput="checkDrawState('+m.id+')">'+
+      '<div class="score-inputs"><input class="score-box" id="s2-'+m.id+'" type="number" min="0" max="99" value="'+s2Init+'" placeholder="—"'+(locked?' disabled':'')+'>'+
       '</div></div>'+
-      '</div>'+ligaHtml+winnerPickerHtml;
-
+      '</div>'+ligaHtml;
   } else {
     const pts=m.custom_points||2;
     body='<div class="special-wrap"><div class="special-title">🌟 '+m.title+'<span class="special-pts">+'+pts+' pts</span></div>'+
-      '<input class="special-input" id="sp-'+m.id+'" type="text" placeholder="Твой ответ..." value="'+(p?.prediction||'')+'\"'+(locked?' disabled':'')+'>'+
+      '<input class="special-input" id="sp-'+m.id+'" type="text" placeholder="Твой ответ..." value="'+(p?.prediction||'')+'"'+(locked?' disabled':'')+'>'+
       '</div>';
   }
 
-  const resScore=m.result?m.result.split('|')[0]:'';const resWinner=m.result&&m.result.includes('|')?m.result.split('|')[1]:'';
-  const resHtml=hasRes?'<div class="result-badge">✅ '+resScore+(resWinner?' → <b>'+resWinner+'</b>':'')+'</div>':'';
+  const resScore=m.result?m.result.split('|')[0]:'';
+  const resHtml=hasRes?'<div class="result-badge">✅ '+resScore+'</div>':'';
 
-  // pred-info: показываем счёт + выбранного победителя если есть
   let predInfo='';
   if(p){
-    const rawPred=p.prediction;
+    const rawPred=p.prediction||'';
     const dispScore=rawPred.includes('|')?rawPred.split('|')[0]:rawPred;
-    const dispWinner=rawPred.includes('|')?rawPred.split('|')[1]:'';
-    const dispStr='<b>'+dispScore+'</b>'+(dispWinner?' <span style="color:var(--teal)">→ '+dispWinner+'</span>':'');
+    const dispStr='<b>'+dispScore+'</b>';
     const pts=Number(p.points);
     if(hasRes&&p.points!=null){
-      predInfo='<div class="pred-info"><div class="pred-val">Прогноз: '+dispStr+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div><div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'\">'+(pts>0?'+':'')+pts+' pts</div></div>';
+      predInfo='<div class="pred-info"><div class="pred-val">Прогноз: '+dispStr+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div><div class="pts '+(pts>0?'pos':pts<0?'neg':'')+'">'+(pts>0?'+':'')+pts+' pts</div></div>';
     } else {
       predInfo='<div class="pred-info"><div class="pred-val">Прогноз: '+dispStr+(p.is_x2?'<span class="x2-tag">x2</span>':'')+'</div><div class="pts wait">⏳ ждём</div></div>';
     }
@@ -853,23 +864,105 @@ function buildCard(m){
     if(others.length){
       othersHtml='<div class="others-preds"><div class="others-title">👥 Прогнозы игроков</div><div class="others-list">'+
         others.map(r=>{
-          const pts=Number(r.points);const ph=r.points!=null?'<span class="opts '+(pts>0?'pos':'neg')+'\">'+(pts>0?'+':'')+pts+'</span>':'';
-          const dispP=r.prediction.includes('|')?r.prediction.split('|')[0]+'→'+r.prediction.split('|')[1]:r.prediction;
+          const pts=Number(r.points);const ph=r.points!=null?'<span class="opts '+(pts>0?'pos':'neg')+'">'+(pts>0?'+':'')+pts+'</span>':'';
+          const dispP=r.prediction.includes('|')?r.prediction.split('|')[0]:r.prediction;
           return'<div class="other-chip '+(r.is_x2?'ox2':'')+'"><span class="oname">'+r.name+':</span><span>'+dispP+'</span>'+(r.is_x2?'<span class="x2-tag">x2</span>':'')+ph+'</div>';
         }).join('')+'</div></div>';
     }
   } else if(locked&&matchPreds[m.id]===undefined)loadMatchPreds(m.id);
 
   const bottom=!locked?'<div class="card-bottom">'+
-    '<button class="x2-btn '+(isX2?'active':m.type!=='special'&&getX2UsedMatchId(m.id)&&!isX2?'used':'')+'\" id="x2-'+m.id+'" onclick="toggleX2(\''+m.id+'\')">🎲 ×2</button>'+
+    '<button class="x2-btn '+(isX2?'active':m.type!=='special'&&getX2UsedMatchId(m.id)&&!isX2?'used':'')+'" id="x2-'+m.id+'" onclick="toggleX2(\''+m.id+'\')">🎲 ×2</button>'+
     (p?'<button class="clear-btn" onclick="clearPred(\''+m.id+'\')">✕</button>':'')+
     '<button class="save-btn" id="save-'+m.id+'" onclick="save(\''+m.id+'\',\''+m.type+'\')">✓ Сохранить</button>'+
     '</div>':'';
 
-  const headerLabel=m.type==='match'?(grp?'Группа '+grp:'⚽ Плей-офф'):'🌟 Особое событие';
-  return'<div class="match-card '+(p?'has-pred':'')+' '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+' '+(m.type==='special'?'special-card':'')+'\" id="card-'+m.id+'">'+
+  const headerLabel=m.type==='match'?(grp?'Группа '+grp:'⚽ Матч'):'🌟 Особое событие';
+  return'<div class="match-card '+(p?'has-pred':'')+' '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+' '+(m.type==='special'?'special-card':'')+'" id="card-'+m.id+'">'+
     '<div class="match-header"><div class="match-group">'+headerLabel+'</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
     body+resHtml+predInfo+othersHtml+bottom+'</div>';
+}
+
+// ── КАРТОЧКА ПЛЕЙ-ОФФ (список событий) ───────────────────────────────────────
+function buildKnockoutCard(m,locked,dlTxt,dlCls){
+  const c1=teamColor(m.team1),c2=teamColor(m.team2);
+  const evs=matchEvents[m.id];
+  const headerFlags='<div class="score-row" style="padding-bottom:8px">'+
+    '<div class="team-block">'+mkTeamAvatar(m.team1,c1)+'<div class="team-name">'+m.team1+'</div></div>'+
+    '<div class="score-sep" style="padding:0 4px 8px">vs</div>'+
+    '<div class="team-block">'+mkTeamAvatar(m.team2,c2)+'<div class="team-name">'+m.team2+'</div></div>'+
+    '</div>';
+
+  let eventsHtml='';
+  if(evs===undefined){
+    eventsHtml='<div class="mev-list"><div style="text-align:center;padding:14px"><div class="spin" style="width:20px;height:20px;margin:0 auto"></div></div></div>';
+    loadMatchEvents(m.id);
+  } else if(evs===null||evs.length===0){
+    eventsHtml='<div class="mev-rules">События ещё не заданы администратором</div>';
+  } else {
+    let boostUsed=0;
+    evs.forEach(ev=>{const pk=eventPicks[ev.id];if(pk&&pk.is_boost)boostUsed++;});
+    eventsHtml='<div class="mev-list">'+evs.map(ev=>buildEventRow(ev,m,locked,boostUsed)).join('')+'</div>';
+    if(!locked){
+      eventsHtml+='<div class="mev-boost-summary">⚡ Молнии: '+boostUsed+'/3</div>';
+      eventsHtml+='<div class="mev-rules">✓ Угадал +2 · ✗ Ошибся −1 · ⚡ удваивает · пропуск = 0</div>';
+    }
+  }
+
+  const bottom=!locked&&evs&&evs.length?'<div class="card-bottom">'+
+    '<button class="save-btn" id="save-ev-'+m.id+'" onclick="saveEvents('+m.id+')" style="margin-left:0;width:100%">✓ Сохранить ставки</button>'+
+    '</div>':'';
+
+  return'<div class="match-card '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+'" id="card-'+m.id+'">'+
+    '<div class="match-header"><div class="match-group">⚽ Плей-офф</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
+    headerFlags+eventsHtml+bottom+'</div>';
+}
+
+// ── СТРОКА СОБЫТИЯ ────────────────────────────────────────────────────────────
+function buildEventRow(ev,m,locked,boostUsed){
+  const pick=eventPicks[ev.id];
+  const hasResult=ev.result!=null&&ev.result!=='';
+  const boostDisabled=locked||(pick?.is_boost?false:boostUsed>=3);
+
+  if(ev.kind==='outcome'){
+    const ans=pick?.answer||'';
+    const o1=ans==='team1'?'out-active':'';
+    const od=ans==='draw'?'out-active':'';
+    const o2=ans==='team2'?'out-active':'';
+    let resLine='';
+    if(hasResult){
+      const rmap={team1:'П1',draw:'Ничья',team2:'П2'};
+      const pts=pick?.points;
+      const ptsStr=pts!=null?' <span style="color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'';
+      resLine='<span class="mev-res">Итог: '+(rmap[ev.result]||ev.result)+ptsStr+'</span>';
+    }
+    return'<div class="mev-outcome">'+
+      '<div class="mev-outcome-label">'+ev.label+(pick?.is_boost?' <span style="color:#c084fc">⚡</span>':'')+resLine+'</div>'+
+      '<div class="mev-outcome-btns">'+
+      '<button class="mev-out-btn '+o1+'" onclick="pickOutcome('+ev.id+',\'team1\','+m.id+')"'+(locked?' disabled':'')+'>П1<br>'+m.team1+'</button>'+
+      '<button class="mev-out-btn '+od+'" onclick="pickOutcome('+ev.id+',\'draw\','+m.id+')"'+(locked?' disabled':'')+'>Ничья</button>'+
+      '<button class="mev-out-btn '+o2+'" onclick="pickOutcome('+ev.id+',\'team2\','+m.id+')"'+(locked?' disabled':'')+'>П2<br>'+m.team2+'</button>'+
+      '<button class="mev-boost '+(pick?.is_boost?'boost-active':'')+'" onclick="toggleBoost('+ev.id+','+m.id+')"'+(boostDisabled?' disabled':'')+'>⚡</button>'+
+      '</div></div>';
+  }
+
+  const ans=pick?.answer||'';
+  const yesCls=ans==='yes'?'yes-active':'';
+  const noCls=ans==='no'?'no-active':'';
+  let resLine='';
+  if(hasResult){
+    const pts=pick?.points;
+    const ptsStr=pts!=null?' <span style="color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'';
+    resLine='<span class="mev-res">Итог: '+(ev.result==='yes'?'Да':'Нет')+ptsStr+'</span>';
+  }
+  return'<div class="mev-row">'+
+    '<div class="mev-label">'+ev.label+(pick?.is_boost?' <span style="color:#c084fc">⚡</span>':'')+resLine+'</div>'+
+    '<div class="mev-toggle">'+
+    '<button class="mev-btn '+yesCls+'" onclick="pickBinary('+ev.id+',\'yes\','+m.id+')"'+(locked?' disabled':'')+'>Да</button>'+
+    '<button class="mev-btn '+noCls+'" onclick="pickBinary('+ev.id+',\'no\','+m.id+')"'+(locked?' disabled':'')+'>Нет</button>'+
+    '</div>'+
+    '<button class="mev-boost '+(pick?.is_boost?'boost-active':'')+'" onclick="toggleBoost('+ev.id+','+m.id+')"'+(boostDisabled?' disabled':'')+'>⚡</button>'+
+    '</div>';
 }
 
 async function loadMatchPreds(mid){
@@ -881,32 +974,72 @@ async function loadMatchPreds(mid){
     if(m&&card)card.outerHTML=buildCard(m);
   }
 }
-// ── WINNER PICKER ────────────────────────────────────────────────────────────
-function checkDrawState(mid){
-  const s1=document.getElementById('s1-'+mid)?.value;
-  const s2=document.getElementById('s2-'+mid)?.value;
-  const pickerEl=document.getElementById('winner-pick-'+mid);
-  if(!pickerEl)return;
-  const isDraw=s1!==''&&s2!==''&&!isNaN(parseInt(s1))&&!isNaN(parseInt(s2))&&parseInt(s1)===parseInt(s2);
-  pickerEl.style.display=isDraw?'block':'none';
-  if(!isDraw){
-    // Сбрасываем выбор победителя при не-ничье
-    delete winnerPicks[mid];
-    pickerEl.querySelectorAll('.winner-flag').forEach(b=>{
-      b.classList.remove('winner-selected','winner-unselected');
-    });
+// ── СОБЫТИЯ ПЛЕЙ-ОФФ: загрузка ───────────────────────────────────────────────
+async function loadMatchEvents(mid){
+  matchEvents[mid]=null;
+  const evRes=await sbGet('match_events','?match_id=eq.'+mid+'&select=*&order=sort_order');
+  matchEvents[mid]=Array.isArray(evRes)?evRes:[];
+  // Загружаем свои ставки по этим событиям
+  if(matchEvents[mid].length){
+    const ids=matchEvents[mid].map(e=>e.id).join(',');
+    const predRes=await sbGet('event_predictions','?event_id=in.('+ids+')&user_id=eq.'+uid+'&select=*');
+    if(Array.isArray(predRes)){
+      predRes.forEach(ep=>{eventPicks[ep.event_id]={answer:ep.answer,is_boost:ep.is_boost,points:ep.points};});
+    }
   }
+  const card=document.getElementById('card-'+mid);const m=matches.find(m=>m.id==mid);
+  if(m&&card)card.outerHTML=buildCard(m);
 }
 
-function pickWinner(mid,btn){
-  const team=btn.dataset.team;
-  winnerPicks[mid]=team;
-  const picker=document.getElementById('winner-pick-'+mid);
-  if(!picker)return;
-  picker.querySelectorAll('.winner-flag').forEach(b=>{
-    b.classList.toggle('winner-selected',b.dataset.team===team);
-    b.classList.toggle('winner-unselected',b.dataset.team!==team);
-  });
+function pickBinary(eventId,ans,mid){
+  const cur=eventPicks[eventId];
+  if(cur&&cur.answer===ans){delete eventPicks[eventId];}
+  else{eventPicks[eventId]={answer:ans,is_boost:cur?.is_boost||false,points:null};}
+  rerenderCard(mid);
+}
+
+function pickOutcome(eventId,ans,mid){
+  const cur=eventPicks[eventId];
+  if(cur&&cur.answer===ans){delete eventPicks[eventId];}
+  else{eventPicks[eventId]={answer:ans,is_boost:cur?.is_boost||false,points:null};}
+  rerenderCard(mid);
+}
+
+function toggleBoost(eventId,mid){
+  const cur=eventPicks[eventId];
+  if(!cur||!cur.answer){toast('Сначала выбери ответ','err');return;}
+  if(!cur.is_boost){
+    const evs=matchEvents[mid]||[];
+    let used=0;evs.forEach(ev=>{const pk=eventPicks[ev.id];if(pk&&pk.is_boost&&ev.id!==eventId)used++;});
+    if(used>=3){toast('Максимум 3 молнии на матч','err');return;}
+  }
+  cur.is_boost=!cur.is_boost;
+  rerenderCard(mid);
+}
+
+function rerenderCard(mid){
+  const card=document.getElementById('card-'+mid);const m=matches.find(m=>m.id==mid);
+  if(m&&card)card.outerHTML=buildCard(m);
+}
+
+async function saveEvents(mid){
+  const btn=document.getElementById('save-ev-'+mid);
+  if(btn){btn.textContent='Сохраняем...';btn.disabled=true;}
+  const evs=matchEvents[mid]||[];
+  let saved=0,errors=0;
+  for(const ev of evs){
+    const pick=eventPicks[ev.id];
+    if(pick&&pick.answer){
+      const res=await sbRpc('upsert_event_prediction',{p_event_id:ev.id,p_user_id:uid,p_answer:pick.answer,p_is_boost:pick.is_boost||false});
+      if(res?.error){errors++;toast(ev.label+': '+res.error,'err');}
+      else{saved++;pick.points=null;}
+    } else {
+      await sbRpc('clear_event_prediction',{p_event_id:ev.id,p_user_id:uid});
+    }
+  }
+  if(btn){btn.textContent='✓ Сохранить ставки';btn.disabled=false;}
+  if(errors===0)toast('✅ Ставки сохранены ('+saved+')','ok');
+  rerenderCard(mid);
 }
 
 function toggleX2(mid){
@@ -926,12 +1059,6 @@ async function save(mid,type){
     const s1=document.getElementById('s1-'+mid)?.value,s2=document.getElementById('s2-'+mid)?.value;
     if(s1===''||s2===''){toast('Введи счёт!','err');return;}
     prediction=s1+':'+s2;
-    // Для плей-офф ничьих добавляем выбор победителя
-    const matchObj=matches.find(m=>m.id==mid);
-    const isKnockoutSave=matchObj&&!getGroup(matchObj);
-    if(isKnockoutSave&&parseInt(s1)===parseInt(s2)&&!isNaN(parseInt(s1))&&winnerPicks[mid]){
-      prediction=s1+':'+s2+'|'+winnerPicks[mid];
-    }
   } else {prediction=document.getElementById('sp-'+mid)?.value.trim();if(!prediction){toast('Введи ответ!','err');return;}}
   const isX2=document.getElementById('x2-'+mid)?.classList.contains('active')||false;
   const btn=document.getElementById('save-'+mid);if(btn){btn.textContent='...';btn.disabled=true;}
@@ -950,7 +1077,7 @@ async function clearPred(mid){
   const res=await sbRpc('clear_prediction',{p_user_id:uid,p_match_id:parseInt(mid)});
   clearing[mid]=false;
   if(res?.error){toast(res.error,'err');}else{
-    toast('🗑️ Прогноз убран','ok');delete preds[mid];delete winnerPicks[mid];
+    toast('🗑️ Прогноз убран','ok');delete preds[mid];
     const card=document.getElementById('card-'+mid);const m=matches.find(m=>m.id==mid);
     if(m&&card)card.outerHTML=buildCard(m);updateBadge();
   }
@@ -1321,11 +1448,10 @@ function renderAdminList(){
       const dlLocal=m.deadline?new Date(m.deadline).toISOString().slice(0,16):'';
       const t1=m.team1||'';const t2=m.team2||'';
       const titleDisplay=m.title||(t1&&t2?t1+' vs '+t2:'Матч '+m.id);
-      return'<div class="admin-card" id="acard-'+m.id+'">'+
+      const commonHead='<div class="admin-card" id="acard-'+m.id+'">'+
         '<div class="admin-title"><span>'+(m.type==='match'?'⚽':'🌟')+' '+titleDisplay+' '+pts+'</span>'+
         '<button class="del-btn" onclick="deleteMatch('+m.id+')">🗑️</button></div>'+
         '<div class="dl-badge">🕐 Дедлайн: '+dlStr+'</div>'+
-        (m.result?'<div class="res-set">✅ '+m.result+' <button class="admin-btn grey sm" onclick="clearRes('+m.id+')">↺</button></div>':'')+
         (m.type==='special'?
           '<div class="edit-dl-row">'+
           '<input class="edit-dl-input" id="title-'+m.id+'" type="text" placeholder="Текст события" value="'+(m.title||'').replace(/"/g,'&quot;')+'">'+
@@ -1334,21 +1460,27 @@ function renderAdminList(){
         '<div class="edit-dl-row">'+
         '<input class="edit-dl-input" id="dl-'+m.id+'" type="datetime-local" value="'+dlLocal+'">'+
         '<button class="admin-btn grey sm" onclick="updateDeadline('+m.id+')">🕐</button>'+
-        '</div>'+
+        '</div>';
+
+      // ПЛЕЙ-ОФФ МАТЧ → управление событиями
+      if(isKnockoutAdmin){
+        return commonHead+
+          '<div id="adm-events-'+m.id+'" class="adm-events">'+
+          '<div style="text-align:center;padding:8px"><button class="admin-btn grey sm" onclick="loadAdminEvents('+m.id+')">📋 Показать события</button></div>'+
+          '</div>'+
+          '</div>';
+      }
+
+      // ОБЫЧНЫЙ МАТЧ или ОСОБОЕ СОБЫТИЕ → результат как раньше
+      return commonHead+
+        (m.result?'<div class="res-set">✅ '+m.result+' <button class="admin-btn grey sm" onclick="clearRes('+m.id+')">↺</button></div>':'')+
         '<div class="admin-row" style="margin-top:6px">'+
         '<input class="admin-input" id="res-'+m.id+'" type="text" '+
-          'placeholder="'+(m.type==='match'?'2:1'+(isKnockoutAdmin?' или 1:1|Spain':''):'результат')+'" '+
-          'value="'+(m.result||'')+'" oninput="checkAdminDraw('+m.id+')">'+
+          'placeholder="'+(m.type==='match'?'2:1':'результат')+'" '+
+          'value="'+(m.result||'')+'">'+
         '<button class="admin-btn" id="abtn-'+m.id+'" onclick="setResult('+m.id+')">✓</button>'+
         '<button class="admin-btn grey sm" onclick="showMatchPreds('+m.id+')">👁</button>'+
         '</div>'+
-        (isKnockoutAdmin&&t1&&t2?
-          '<div id="adm-pick-'+m.id+'" style="display:none;padding:6px 0">'+
-          '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Кто прошёл дальше:</div>'+
-          '<div style="display:flex;gap:6px">'+
-          '<button class="admin-btn grey sm" id="adw1-'+m.id+'" data-team="'+t1.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+t1+'</button>'+
-          '<button class="admin-btn grey sm" id="adw2-'+m.id+'" data-team="'+t2.replace(/"/g,'&quot;')+'" onclick="adminPickWinner('+m.id+',this)">'+t2+'</button>'+
-          '</div></div>':'')+
         '</div>';
     }catch(e){
       console.error('Admin card error for match',m.id,e.message);
@@ -1377,26 +1509,115 @@ async function setResult(mid){
   if(res?.error)toast(res.error,'err');else{toast('✅ ('+res.counted+' прогнозов)','ok');await loadAll();}
 }
 async function clearRes(mid){if(!confirm('Сбросить?'))return;const res=await sbRpc('clear_match_result',{p_match_id:parseInt(mid)});if(res?.error)toast(res.error,'err');else{toast('↺ Сброшено','ok');await loadAll();}}
-function checkAdminDraw(mid){
-  const resVal=document.getElementById('res-'+mid)?.value||'';
-  const score=resVal.split('|')[0];
-  const parts=score.trim().replace(/[\s\-]+/g,':').split(':');
-  const isDraw=parts.length===2&&parts[0]!==''&&parts[0]===parts[1]&&!isNaN(parseInt(parts[0]));
-  const picker=document.getElementById('adm-pick-'+mid);
-  if(picker)picker.style.display=isDraw?'block':'none';
+// ── АДМИН: управление событиями плей-офф матча ───────────────────────────────
+let adminEvents={}; // {matchId: [events]}
+
+async function loadAdminEvents(mid){
+  const box=document.getElementById('adm-events-'+mid);
+  if(box)box.innerHTML='<div style="text-align:center;padding:8px"><div class="spin" style="width:18px;height:18px;margin:0 auto"></div></div>';
+  const res=await sbGet('match_events','?match_id=eq.'+mid+'&select=*&order=sort_order');
+  adminEvents[mid]=Array.isArray(res)?res:[];
+  renderAdminEvents(mid);
 }
-function adminPickWinner(mid,btn){
-  const team=btn.dataset.team;
-  const resInput=document.getElementById('res-'+mid);
-  if(!resInput)return;
-  const score=resInput.value.split('|')[0].trim();
-  resInput.value=score+'|'+team;
-  document.querySelectorAll('#adm-pick-'+mid+' .admin-btn').forEach(b=>{
-    const sel=b.dataset.team===team;
-    b.style.background=sel?'var(--green)':'';
-    b.style.color=sel?'#0a0a0a':'';
-    b.style.border=sel?'none':'';
-  });
+
+function renderAdminEvents(mid){
+  const box=document.getElementById('adm-events-'+mid);
+  if(!box)return;
+  const m=matches.find(x=>x.id==mid);
+  const t1=m?.team1||'К1',t2=m?.team2||'К2';
+  const evs=adminEvents[mid]||[];
+  if(!evs.length){
+    box.innerHTML='<div style="padding:8px;text-align:center">'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Событий пока нет</div>'+
+      '<button class="admin-btn" onclick="seedEvents('+mid+')" style="width:100%">✨ Создать 6 стандартных событий</button>'+
+      '</div>';
+    return;
+  }
+  box.innerHTML='<div style="font-size:10px;color:var(--muted);padding:4px 0">СОБЫТИЯ МАТЧА (итоги):</div>'+
+    evs.map(ev=>{
+      const hasRes=ev.result!=null&&ev.result!=='';
+      let controls;
+      if(ev.kind==='outcome'){
+        controls='<div style="display:flex;gap:4px;margin-top:4px">'+
+          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'team1\','+mid+')" '+(ev.result==='team1'?'style="background:var(--teal);color:#0a1a18"':'')+'>П1</button>'+
+          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'draw\','+mid+')" '+(ev.result==='draw'?'style="background:var(--teal);color:#0a1a18"':'')+'>Ничья</button>'+
+          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'team2\','+mid+')" '+(ev.result==='team2'?'style="background:var(--teal);color:#0a1a18"':'')+'>П2</button>'+
+          '</div>';
+      } else {
+        controls='<div style="display:flex;gap:4px;margin-top:4px">'+
+          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'yes\','+mid+')" '+(ev.result==='yes'?'style="background:var(--green);color:#0a1a0a"':'')+'>Да</button>'+
+          '<button class="admin-btn grey sm" onclick="setEventRes('+ev.id+',\'no\','+mid+')" '+(ev.result==='no'?'style="background:var(--red);color:#1a0808"':'')+'>Нет</button>'+
+          '</div>';
+      }
+      return'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="display:flex;align-items:center;gap:6px">'+
+        '<input class="admin-input" style="flex:1;font-size:11px" id="evlbl-'+ev.id+'" value="'+(ev.label||'').replace(/"/g,'&quot;')+'">'+
+        '<button class="admin-btn grey sm" onclick="updateEventLabel('+ev.id+','+mid+')">✏️</button>'+
+        '<button class="del-btn" onclick="deleteEvent('+ev.id+','+mid+')">🗑️</button>'+
+        '</div>'+
+        controls+
+        (hasRes?'<div style="font-size:10px;color:var(--green);margin-top:3px">✅ засчитано <button class="admin-btn grey sm" style="padding:1px 6px" onclick="clearEventRes('+ev.id+','+mid+')">↺</button></div>':'')+
+        '</div>';
+    }).join('')+
+    '<div style="display:flex;gap:4px;margin-top:8px">'+
+    '<input class="admin-input" id="newev-'+mid+'" placeholder="Новое событие (да/нет)" style="flex:1;font-size:11px">'+
+    '<button class="admin-btn" onclick="addMatchEvent('+mid+')">➕</button>'+
+    '</div>';
+}
+
+async function seedEvents(mid){
+  const res=await sbRpc('seed_default_events',{p_match_id:parseInt(mid)});
+  if(res?.error){toast(res.error,'err');return;}
+  toast('✅ Создано 6 событий','ok');
+  await loadAdminEvents(mid);
+}
+
+async function setEventRes(eventId,result,mid){
+  const res=await sbRpc('set_event_result',{p_event_id:eventId,p_result:result});
+  if(res?.error){toast(res.error,'err');return;}
+  toast('✅ Засчитано ('+res.counted+' ставок)','ok');
+  const ev=(adminEvents[mid]||[]).find(e=>e.id===eventId);if(ev)ev.result=result;
+  renderAdminEvents(mid);
+  // Обновляем лидерборд
+  const lbRes=await sbGet('leaderboard','?select=*');if(Array.isArray(lbRes)){lb=lbRes;}
+}
+
+async function clearEventRes(eventId,mid){
+  const res=await sbRpc('clear_event_result',{p_event_id:eventId});
+  if(res?.error){toast(res.error,'err');return;}
+  toast('↺ Сброшено','ok');
+  const ev=(adminEvents[mid]||[]).find(e=>e.id===eventId);if(ev)ev.result=null;
+  renderAdminEvents(mid);
+}
+
+async function updateEventLabel(eventId,mid){
+  const val=document.getElementById('evlbl-'+eventId)?.value.trim();
+  if(!val){toast('Введи текст','err');return;}
+  const res=await fetchT(SB_URL+'/rest/v1/match_events?id=eq.'+eventId,{method:'PATCH',headers:{...SB_HEADERS,'Prefer':'return=minimal'},body:JSON.stringify({label:val})});
+  if(!res.ok){toast('Ошибка','err');return;}
+  toast('✅ Обновлено','ok');
+  const ev=(adminEvents[mid]||[]).find(e=>e.id===eventId);if(ev)ev.label=val;
+}
+
+async function deleteEvent(eventId,mid){
+  if(!confirm('Удалить это событие и все ставки на него?'))return;
+  const res=await sbDelete('match_events','?id=eq.'+eventId);
+  if(res?.error){toast('Ошибка','err');return;}
+  toast('🗑️ Удалено','ok');
+  adminEvents[mid]=(adminEvents[mid]||[]).filter(e=>e.id!==eventId);
+  renderAdminEvents(mid);
+}
+
+async function addMatchEvent(mid){
+  const inp=document.getElementById('newev-'+mid);
+  const label=inp?.value.trim();
+  if(!label){toast('Введи текст события','err');return;}
+  const evs=adminEvents[mid]||[];
+  const maxOrder=evs.reduce((mx,e)=>Math.max(mx,e.sort_order||0),0);
+  const res=await sbPost('match_events',{match_id:parseInt(mid),label,kind:'binary',sort_order:maxOrder+1});
+  if(res?.error){toast(res.error,'err');return;}
+  toast('✅ Добавлено','ok');
+  await loadAdminEvents(mid);
 }
 
 async function updateTitle(mid){
