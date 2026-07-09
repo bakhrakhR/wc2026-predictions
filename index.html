@@ -952,13 +952,49 @@ function buildKnockoutCard(m,locked,dlTxt,dlCls){
     }
   }
 
+  // После дедлайна показываем ставки всех участников
+  let othersHtml='';
+  if(locked&&evs&&evs.length){
+    if(knockoutAllPreds[m.id]===undefined){
+      loadKnockoutAllPreds(m.id);
+      othersHtml='<div style="text-align:center;padding:8px"><div class="spin" style="width:16px;height:16px;margin:0 auto"></div></div>';
+    } else if(Array.isArray(knockoutAllPreds[m.id])&&knockoutAllPreds[m.id].length){
+      const allP=knockoutAllPreds[m.id];
+      othersHtml='<div class="others-preds" style="border-top:1px solid var(--border);padding:7px 14px 10px">'+
+        '<div class="others-title">👥 Ставки участников</div>'+
+        evs.map(ev=>{
+          const evPreds=allP.filter(p=>p.event_id===ev.id);
+          if(!evPreds.length)return'';
+          return'<div style="margin-top:6px">'+
+            '<div style="font-size:10px;font-weight:700;color:var(--muted)">'+ev.label+'</div>'+
+            '<div class="others-list">'+evPreds.map(p=>{
+              const pts=p.points!=null?Number(p.points):null;
+              const ph=pts!=null?'<span class="opts '+(pts>0?'pos':'neg')+'">'+(pts>0?'+':'')+pts+'</span>':'';
+              return'<div class="other-chip '+(p.is_boost?'ox2':'')+'"><span class="oname">'+p.name+':</span><span>'+evAnswerLabel(ev,m,p.answer)+'</span>'+(p.is_boost?'<span style="color:#c084fc">⚡</span>':'')+ph+'</div>';
+            }).join('')+'</div></div>';
+        }).join('')+'</div>';
+    }
+  }
+
   const bottom=!locked&&evs&&evs.length?'<div class="card-bottom">'+
     '<button class="save-btn" id="save-ev-'+m.id+'" onclick="saveEvents('+m.id+')" style="margin-left:0;width:100%">✓ Сохранить ставки</button>'+
     '</div>':'';
 
   return'<div class="match-card '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+'" id="card-'+m.id+'">'+
     '<div class="match-header"><div class="match-group">⚽ Плей-офф</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
-    headerFlags+eventsHtml+bottom+'</div>';
+    headerFlags+eventsHtml+othersHtml+bottom+'</div>';
+}
+
+// ── Загрузка ставок ВСЕХ игроков на события плей-офф (после дедлайна) ─────────
+let knockoutAllPreds={};
+async function loadKnockoutAllPreds(mid){
+  knockoutAllPreds[mid]=null;
+  const evs=matchEvents[mid]||[];
+  if(!evs.length){knockoutAllPreds[mid]=[];return;}
+  const ids=evs.map(e=>e.id).join(',');
+  const res=await sbGet('event_predictions','?event_id=in.('+ids+')&select=*,users(name)');
+  knockoutAllPreds[mid]=Array.isArray(res)?res.map(r=>({...r,name:r.users?.name||'Игрок'})):[];
+  rerenderCard(mid);
 }
 
 // ── СТРОКА СОБЫТИЯ ────────────────────────────────────────────────────────────
