@@ -275,6 +275,24 @@ select.add-input{cursor:pointer;}
 .mev-out-btn{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:8px 4px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:10px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.15s;text-align:center;line-height:1.2;}
 .mev-out-btn.out-active{background:var(--teal);border-color:var(--teal);color:#0a1a18;}
 .mev-boost-summary{font-size:10px;color:#c084fc;font-weight:700;text-align:right;padding:6px 14px 0;}
+.mev-sqs{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap;align-items:center;}
+.mev-sq{width:11px;height:11px;border-radius:3px;display:inline-block;}
+.mev-sq.sq-yes{background:var(--green);}
+.mev-sq.sq-no{background:var(--red);}
+.mev-sq.sq-t1{background:var(--teal);}
+.mev-sq.sq-t2{background:var(--coral);}
+.mev-sq.sq-draw{background:var(--gold);}
+.mev-others{display:none;padding:6px 0 2px;}
+.mev-others.open{display:block;}
+.mev-row-locked{cursor:pointer;}
+.mev-oth-chip{display:flex;align-items:center;gap:5px;font-size:10px;padding:2px 0;}
+.mev-oth-chip .on{color:var(--muted);flex:1;}
+.mev-oth-chip .oa{font-weight:800;}
+.mev-oth-chip .oa.a-yes{color:var(--green);}
+.mev-oth-chip .oa.a-no{color:var(--red);}
+.mev-oth-chip .oa.a-t1{color:var(--teal);}
+.mev-oth-chip .oa.a-t2{color:var(--coral);}
+.mev-oth-chip .oa.a-draw{color:var(--gold);}
 .mev-rules{font-size:10px;color:var(--muted);padding:4px 14px 8px;line-height:1.5;}
 /* ── WINNER PICK ── */
 .winner-pick{padding:10px 14px 6px;border-top:1px solid var(--border);background:#0f1e10;}
@@ -535,7 +553,7 @@ function fmtDL(d){
   const dl=new Date(d),now=new Date(),diff=dl-now,h=diff/3600000;
   if(now>dl){
     const sinceMin=(now-dl)/60000;
-    if(sinceMin<=150)return{text:'🔴 Идёт сейчас',cls:'live'}; // ~2.5ч после дедлайна
+    if(sinceMin<=270)return{text:'🔴 Идёт сейчас',cls:'live'}; // ~4.5ч после дедлайна
     return{text:'🔒 Закрыт',cls:'past'};
   }
   if(h<1)return{text:'⏳ '+Math.ceil(diff/60000)+' мин',cls:'soon'};
@@ -800,7 +818,7 @@ function buildFilters(){
 function setFilter(g){activeGroup=g;buildFilters();renderMatches();}
 function getVisible(){
   const now=new Date(),threeDays=new Date(now.getTime()+3*24*3600*1000);
-  const liveWindow=2.5*3600*1000;
+  const liveWindow=4.5*3600*1000;
   if(activeSubTab==='events'){
     let evs=matches.filter(m=>m.type==='special');
     if(activeEventFilter==='open'){
@@ -952,28 +970,13 @@ function buildKnockoutCard(m,locked,dlTxt,dlCls){
     }
   }
 
-  // После дедлайна показываем ставки всех участников
+  // После дедлайна подгружаем ставки всех участников (показываются квадратиками в строках)
   let othersHtml='';
+  if(locked&&evs&&evs.length&&knockoutAllPreds[m.id]===undefined){
+    loadKnockoutAllPreds(m.id);
+  }
   if(locked&&evs&&evs.length){
-    if(knockoutAllPreds[m.id]===undefined){
-      loadKnockoutAllPreds(m.id);
-      othersHtml='<div style="text-align:center;padding:8px"><div class="spin" style="width:16px;height:16px;margin:0 auto"></div></div>';
-    } else if(Array.isArray(knockoutAllPreds[m.id])&&knockoutAllPreds[m.id].length){
-      const allP=knockoutAllPreds[m.id];
-      othersHtml='<div class="others-preds" style="border-top:1px solid var(--border);padding:7px 14px 10px">'+
-        '<div class="others-title">👥 Ставки участников</div>'+
-        evs.map(ev=>{
-          const evPreds=allP.filter(p=>p.event_id===ev.id);
-          if(!evPreds.length)return'';
-          return'<div style="margin-top:6px">'+
-            '<div style="font-size:10px;font-weight:700;color:var(--muted)">'+ev.label+'</div>'+
-            '<div class="others-list">'+evPreds.map(p=>{
-              const pts=p.points!=null?Number(p.points):null;
-              const ph=pts!=null?'<span class="opts '+(pts>0?'pos':'neg')+'">'+(pts>0?'+':'')+pts+'</span>':'';
-              return'<div class="other-chip '+(p.is_boost?'ox2':'')+'"><span class="oname">'+p.name+':</span><span>'+evAnswerLabel(ev,m,p.answer)+'</span>'+(p.is_boost?'<span style="color:#c084fc">⚡</span>':'')+ph+'</div>';
-            }).join('')+'</div></div>';
-        }).join('')+'</div>';
-    }
+    othersHtml='<div class="mev-rules" style="padding-top:2px">Тапни на событие, чтобы увидеть ставки игроков</div>';
   }
 
   const bottom=!locked&&evs&&evs.length?'<div class="card-bottom">'+
@@ -997,6 +1000,37 @@ async function loadKnockoutAllPreds(mid){
   rerenderCard(mid);
 }
 
+// ── Помощники для отображения чужих ставок в строке события ──────────────────
+function sqClass(ev,ans){
+  if(ev.kind==='binary')return ans==='yes'?'sq-yes':'sq-no';
+  if(ans==='team1')return'sq-t1';
+  if(ans==='team2')return'sq-t2';
+  return'sq-draw';
+}
+function aClass(ev,ans){
+  if(ev.kind==='binary')return ans==='yes'?'a-yes':'a-no';
+  if(ans==='team1')return'a-t1';
+  if(ans==='team2')return'a-t2';
+  return'a-draw';
+}
+function evOthersHtml(ev,m){
+  const allP=knockoutAllPreds[m.id];
+  if(!Array.isArray(allP))return{sqs:'',spoiler:''};
+  const evPreds=allP.filter(p=>p.event_id===ev.id);
+  if(!evPreds.length)return{sqs:'',spoiler:''};
+  const sqs='<div class="mev-sqs">'+evPreds.map(p=>'<span class="mev-sq '+sqClass(ev,p.answer)+'"></span>').join('')+'<span style="font-size:9px;color:var(--muted);margin-left:3px">'+evPreds.length+'</span></div>';
+  const spoiler='<div class="mev-others" id="evoth-'+ev.id+'">'+evPreds.map(p=>{
+    const pts=p.points!=null?Number(p.points):null;
+    const ptsStr=pts!=null?'<span style="font-weight:800;color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'';
+    return'<div class="mev-oth-chip"><span class="on">'+p.name+'</span><span class="oa '+aClass(ev,p.answer)+'">'+evAnswerLabel(ev,m,p.answer)+'</span>'+(p.is_boost?'<span style="color:#c084fc">⚡</span>':'')+ptsStr+'</div>';
+  }).join('')+'</div>';
+  return{sqs,spoiler};
+}
+function toggleEvOthers(evId){
+  const el=document.getElementById('evoth-'+evId);
+  if(el)el.classList.toggle('open');
+}
+
 // ── СТРОКА СОБЫТИЯ ────────────────────────────────────────────────────────────
 function buildEventRow(ev,m,locked,boostUsed){
   const pick=eventPicks[ev.id];
@@ -1016,12 +1050,21 @@ function buildEventRow(ev,m,locked,boostUsed){
       const ptsStr=pts!=null?' <span style="color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'';
       resLine='<span class="mev-res">Итог: '+(rmap[ev.result]||ev.result)+ptsStr+'</span>';
     }
+    if(locked){
+      // Компактный режим после дедлайна: мой ответ + квадратики + спойлер
+      const{sqs,spoiler}=evOthersHtml(ev,m);
+      const myAns=ans?'<span class="oa '+aClass(ev,ans)+'" style="font-size:12px;font-weight:800">'+evAnswerLabel(ev,m,ans)+'</span>':'<span style="color:var(--muted);font-size:11px">пропуск</span>';
+      const myPts=pick&&pick.points!=null?'<span style="font-weight:800;color:'+(Number(pick.points)>0?'var(--green)':'var(--red)')+'">'+(Number(pick.points)>0?'+':'')+pick.points+'</span>':'';
+      return'<div class="mev-outcome mev-row-locked" onclick="toggleEvOthers('+ev.id+')">'+
+        '<div class="mev-outcome-label" style="margin-bottom:2px"><span style="flex:1">'+ev.label+(pick?.is_boost?' <span style="color:#c084fc">⚡</span>':'')+'</span>'+myAns+myPts+'</div>'+
+        resLine+sqs+spoiler+'</div>';
+    }
     return'<div class="mev-outcome">'+
       '<div class="mev-outcome-label">'+ev.label+(pick?.is_boost?' <span style="color:#c084fc">⚡</span>':'')+resLine+'</div>'+
       '<div class="mev-outcome-btns">'+
-      '<button class="mev-out-btn '+o1+'" onclick="pickOutcome('+ev.id+',\'team1\','+m.id+')"'+(locked?' disabled':'')+'>'+m.team1+'</button>'+
-      (isAdvance?'':'<button class="mev-out-btn '+od+'" onclick="pickOutcome('+ev.id+',\'draw\','+m.id+')"'+(locked?' disabled':'')+'>Ничья</button>')+
-      '<button class="mev-out-btn '+o2+'" onclick="pickOutcome('+ev.id+',\'team2\','+m.id+')"'+(locked?' disabled':'')+'>'+m.team2+'</button>'+
+      '<button class="mev-out-btn '+o1+'" onclick="pickOutcome('+ev.id+',\'team1\','+m.id+')">'+m.team1+'</button>'+
+      (isAdvance?'':'<button class="mev-out-btn '+od+'" onclick="pickOutcome('+ev.id+',\'draw\','+m.id+')">Ничья</button>')+
+      '<button class="mev-out-btn '+o2+'" onclick="pickOutcome('+ev.id+',\'team2\','+m.id+')">'+m.team2+'</button>'+
       '<button class="mev-boost '+(pick?.is_boost?'boost-active':'')+'" onclick="toggleBoost('+ev.id+','+m.id+')"'+(boostDisabled?' disabled':'')+'>⚡</button>'+
       '</div></div>';
   }
@@ -1035,11 +1078,19 @@ function buildEventRow(ev,m,locked,boostUsed){
     const ptsStr=pts!=null?' <span style="color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'';
     resLine='<span class="mev-res">Итог: '+(ev.result==='yes'?'Да':'Нет')+ptsStr+'</span>';
   }
+  if(locked){
+    const{sqs,spoiler}=evOthersHtml(ev,m);
+    const myAns=ans?'<span class="oa '+aClass(ev,ans)+'" style="font-size:12px;font-weight:800">'+(ans==='yes'?'Да':'Нет')+'</span>':'<span style="color:var(--muted);font-size:11px">пропуск</span>';
+    const myPts=pick&&pick.points!=null?'<span style="font-weight:800;color:'+(Number(pick.points)>0?'var(--green)':'var(--red)')+'">'+(Number(pick.points)>0?'+':'')+pick.points+'</span>':'';
+    return'<div class="mev-outcome mev-row-locked" onclick="toggleEvOthers('+ev.id+')">'+
+      '<div class="mev-outcome-label" style="margin-bottom:2px"><span style="flex:1">'+ev.label+(pick?.is_boost?' <span style="color:#c084fc">⚡</span>':'')+'</span>'+myAns+myPts+'</div>'+
+      resLine+sqs+spoiler+'</div>';
+  }
   return'<div class="mev-row">'+
     '<div class="mev-label">'+ev.label+(pick?.is_boost?' <span style="color:#c084fc">⚡</span>':'')+resLine+'</div>'+
     '<div class="mev-toggle">'+
-    '<button class="mev-btn '+yesCls+'" onclick="pickBinary('+ev.id+',\'yes\','+m.id+')"'+(locked?' disabled':'')+'>Да</button>'+
-    '<button class="mev-btn '+noCls+'" onclick="pickBinary('+ev.id+',\'no\','+m.id+')"'+(locked?' disabled':'')+'>Нет</button>'+
+    '<button class="mev-btn '+yesCls+'" onclick="pickBinary('+ev.id+',\'yes\','+m.id+')">Да</button>'+
+    '<button class="mev-btn '+noCls+'" onclick="pickBinary('+ev.id+',\'no\','+m.id+')">Нет</button>'+
     '</div>'+
     '<button class="mev-boost '+(pick?.is_boost?'boost-active':'')+'" onclick="toggleBoost('+ev.id+','+m.id+')"'+(boostDisabled?' disabled':'')+'>⚡</button>'+
     '</div>';
