@@ -206,6 +206,23 @@ body{font-family:'Bricolage Grotesque',Arial,sans-serif;background:var(--bg);col
 .add-row{display:flex;gap:6px;margin-bottom:6px;}
 .add-input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--text);outline:none;font-family:'Bricolage Grotesque',Arial,sans-serif;}
 select.add-input{cursor:pointer;}
+/* ── ИТОГИ ── */
+.fin-stub{text-align:center;padding:60px 24px;}
+.fin-stub .ic{font-size:54px;margin-bottom:16px;}
+.fin-stub .t1{font-size:20px;font-weight:800;color:var(--gold);margin-bottom:10px;}
+.fin-stub .t2{font-size:13px;color:var(--muted);line-height:1.5;max-width:280px;margin:0 auto;}
+.fin-hero{background:linear-gradient(135deg,#1a2e1a,#132013);border:1.5px solid var(--gold);border-radius:18px;padding:20px 16px;text-align:center;margin-bottom:14px;}
+.fin-hero .place{font-size:42px;font-weight:800;color:var(--gold);line-height:1;}
+.fin-hero .place-sub{font-size:12px;color:var(--muted);margin-top:6px;}
+.fin-hero .pct-row{display:flex;justify-content:center;gap:22px;margin-top:14px;}
+.fin-hero .pct-item .v{font-size:20px;font-weight:800;color:var(--teal);}
+.fin-hero .pct-item .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+.fin-fact{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;}
+.fin-fact .fic{font-size:20px;flex-shrink:0;}
+.fin-fact .ft{font-size:12px;line-height:1.45;color:var(--text);}
+.fin-fact .ft b{color:var(--gold);}
+.fin-chart-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:12px 6px 8px;margin-bottom:14px;overflow-x:auto;}
+.fin-chart-title{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;padding:0 8px 8px;}
 .collapse-head{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;cursor:pointer;margin-bottom:8px;font-size:13px;font-weight:800;color:var(--text);user-select:none;}
 .collapse-head .arr{transition:transform 0.2s;font-size:12px;color:var(--muted);}
 .collapse-head.open .arr{transform:rotate(180deg);}
@@ -368,6 +385,7 @@ select.add-input{cursor:pointer;}
       <button class="tab" onclick="switchTab('hist',this)">История</button>
       <button class="tab" onclick="switchTab('lb',this)">Рейтинг</button>
       <button class="tab" onclick="switchTab('stats',this)">Стата</button>
+      <button class="tab" onclick="switchTab('finals',this)">Итоги</button>
       <button class="tab admin-tab" id="admin-tab" style="display:none" onclick="switchTab('admin',this)">Админ</button>
     </div>
   </div>
@@ -420,6 +438,10 @@ select.add-input{cursor:pointer;}
   <div class="page" id="page-stats">
     <div class="loader" id="stats-loader" style="margin-top:4px"><div class="spin"></div>Считаем...</div>
     <div id="stats-content" style="display:none;margin-top:4px"></div>
+  </div>
+
+  <div class="page" id="page-finals">
+    <div id="finals-content" style="margin-top:4px"></div>
   </div>
 
   <div class="page" id="page-admin">
@@ -505,6 +527,12 @@ const BOT_USERNAME='Kubikpresa_bot';
 // false = обычная работа для всех
 // Переключи на false и перезалей index.html когда тестирование закончено.
 const MAINTENANCE_MODE=false;
+
+// ── ИТОГИ ТУРНИРА ─────────────────────────────────────────────────────────────
+// false = вкладка "Итоги" показывает заглушку (финал не сыгран)
+// true  = показывает полные итоги: место, факты, таблицу, график мест по дням.
+// После финала: поменяй на true и перезалей index.html.
+const TOURNAMENT_OVER=false;
 
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 // fetchT — fetch с таймаутом. Без него зависшие запросы (частый эффект нестабильной
@@ -1974,6 +2002,288 @@ async function addEvent(){
 }
 function toggleTeams(){document.getElementById('ev-teams').style.display=document.getElementById('ev-type').value==='match'?'flex':'none';}
 
+// ── ИТОГИ ТУРНИРА ─────────────────────────────────────────────────────────────
+let finalsLoaded=false,finalsPreview=false;
+
+function renderFinals(){
+  const el=document.getElementById('finals-content');
+  if(!el)return;
+  if(!TOURNAMENT_OVER&&!finalsPreview){
+    // Кнопка предпросмотра — видна только админу, у остальных просто заглушка
+    const adminBtn=ADMIN_IDS.includes(uid)
+      ?'<button class="admin-btn grey sm" style="margin-top:26px" onclick="previewFinals()">👁 Предпросмотр итогов (видно только тебе)</button>'
+      :'';
+    el.innerHTML='<div class="fin-stub">'+
+      '<div class="ic">🏗️</div>'+
+      '<div class="t1">Итоги ещё готовятся</div>'+
+      '<div class="t2">Финал не сыгран — как только турнир завершится, здесь появятся твоё итоговое место, личная статистика и график гонки за победу 🏆</div>'+
+      '<div style="font-size:36px;margin-top:24px">🐙</div>'+
+      adminBtn+
+      '</div>';
+    return;
+  }
+  if(finalsLoaded)return; // уже отрисовано
+  el.innerHTML='<div class="loader" style="margin-top:20px"><div class="spin"></div>Считаем итоги...</div>';
+  loadFinals();
+}
+
+function previewFinals(){
+  finalsPreview=true;
+  const el=document.getElementById('finals-content');
+  if(el)el.innerHTML='<div class="loader" style="margin-top:20px"><div class="spin"></div>Считаем итоги...</div>';
+  loadFinals();
+}
+
+async function loadFinals(){
+  const el=document.getElementById('finals-content');
+  try{
+    // Загружаем ВСЁ: все прогнозы всех игроков (нужны для фактов и графика)
+    const[allPredsRes,allEpRes,allEvRes,usersRes]=await Promise.all([
+      sbGet('predictions','?select=*'),
+      sbGet('event_predictions','?select=*'),
+      sbGet('match_events','?select=*'),
+      sbGet('users','?select=*')
+    ]);
+    const allPreds=Array.isArray(allPredsRes)?allPredsRes:[];
+    const allEp=Array.isArray(allEpRes)?allEpRes:[];
+    const allEv=Array.isArray(allEvRes)?allEvRes:[];
+    const allUsers=Array.isArray(usersRes)?usersRes:[];
+    if(allPredsRes?.error||allEpRes?.error){
+      el.innerHTML='<div class="empty" style="padding:20px;color:var(--red)">Ошибка загрузки данных, попробуй позже</div>';return;
+    }
+    const nameOf={};allUsers.forEach(u=>{nameOf[String(u.user_id)]=u.name||'Игрок';});
+    const evById={};allEv.forEach(ev=>{evById[ev.id]=ev;});
+    const matchById={};matches.forEach(m=>{matchById[m.id]=m;});
+
+    // ── Моё место и % угаданных ──
+    const sortedLb=[...lb].sort((a,b)=>Number(b.points)-Number(a.points));
+    const myIdx=sortedLb.findIndex(r=>String(r.user_id)===String(uid));
+    const myPlace=myIdx>=0?myIdx+1:null;
+    const myRow=myIdx>=0?sortedLb[myIdx]:null;
+    // все мои рассчитанные ставки (обе таблицы)
+    const myScored=[
+      ...allPreds.filter(p=>String(p.user_id)===String(uid)&&p.points!=null),
+      ...allEp.filter(p=>String(p.user_id)===String(uid)&&p.points!=null)
+    ];
+    const myHits=myScored.filter(p=>Number(p.points)>0).length;
+    const myPct=myScored.length?Math.round(myHits/myScored.length*100):0;
+
+    // ── Факты ──
+    const facts=computeFacts(allPreds,allEp,evById,matchById);
+
+    // ── График мест по дням ──
+    const chartHtml=buildRaceChart(allPreds,allEp,evById,matchById,nameOf);
+
+    // ── Итоговая таблица ──
+    const medals=['🥇','🥈','🥉'];
+    const tableHtml='<div class="fin-chart-title" style="padding-top:4px">Итоговая таблица</div>'+
+      sortedLb.map((p,i)=>{
+        const isMe=String(p.user_id)===String(uid);
+        const pts=Math.round(Number(p.points)*10)/10;
+        return'<div class="lb-row '+(isMe?'me':'')+'" style="margin-bottom:6px">'+
+          '<div class="lb-rank">'+(medals[i]||(i+1))+'</div>'+
+          '<div class="lb-info"><div class="lb-name">'+(p.name||'?')+(isMe?' 👈':'')+'</div><div class="lb-count">'+(p.prediction_count||0)+' прогнозов</div></div>'+
+          '<div class="lb-pts">'+(pts>0?'+':'')+pts+'</div>'+
+          '</div>';
+      }).join('');
+
+    el.innerHTML=
+      '<div class="fin-hero">'+
+      '<div style="font-size:13px;color:var(--muted);margin-bottom:8px">🏆 Турнир завершён!</div>'+
+      (myPlace?'<div class="place">'+(medals[myPlace-1]||'#'+myPlace)+'</div>'+
+        '<div class="place-sub">твоё итоговое место'+(myPlace===1?' — ЧЕМПИОН! 🎉':'')+'</div>':'')+
+      '<div class="pct-row">'+
+      '<div class="pct-item"><div class="v">'+myPct+'%</div><div class="l">угадано</div></div>'+
+      '<div class="pct-item"><div class="v">'+(myRow?Math.round(Number(myRow.points)*10)/10:0)+'</div><div class="l">очков</div></div>'+
+      '<div class="pct-item"><div class="v">'+myScored.length+'</div><div class="l">ставок</div></div>'+
+      '</div></div>'+
+      (facts.length?'<div class="fin-chart-title">Твои моменты турнира</div>'+facts.map(f=>'<div class="fin-fact"><div class="fic">'+f.icon+'</div><div class="ft">'+f.text+'</div></div>').join(''):'')+
+      chartHtml+
+      tableHtml;
+    finalsLoaded=true;
+  }catch(e){
+    console.error('finals',e);
+    if(el)el.innerHTML='<div class="empty" style="padding:20px;color:var(--red)">Ошибка: '+e.message+'</div>';
+  }
+}
+
+// ── 3 факта из реальных данных (без придумывания) ─────────────────────────────
+function computeFacts(allPreds,allEp,evById,matchById){
+  const facts=[];
+  const my=String(uid);
+
+  // Кандидат 1: "Ты один угадал X" — событие/матч, где я в плюсе, а ВСЕ остальные поставившие в нуле/минусе
+  let unique=null;
+  // по событиям плей-офф
+  const epByEvent={};
+  allEp.forEach(p=>{if(p.points==null)return;(epByEvent[p.event_id]=epByEvent[p.event_id]||[]).push(p);});
+  Object.keys(epByEvent).forEach(evId=>{
+    const rows=epByEvent[evId];
+    const mine=rows.find(r=>String(r.user_id)===my&&Number(r.points)>0);
+    if(!mine)return;
+    const others=rows.filter(r=>String(r.user_id)!==my);
+    if(others.length>=2&&others.every(r=>Number(r.points)<=0)){
+      const ev=evById[evId];const m=ev?matchById[ev.match_id]:null;
+      const label=(ev?ev.label:'событие')+(m?' ('+m.team1+' — '+m.team2+')':'');
+      if(!unique||others.length>unique.others)unique={label,others:others.length};
+    }
+  });
+  // по обычным матчам/спец-событиям
+  const prByMatch={};
+  allPreds.forEach(p=>{if(p.points==null)return;(prByMatch[p.match_id]=prByMatch[p.match_id]||[]).push(p);});
+  Object.keys(prByMatch).forEach(mid=>{
+    const m=matchById[mid];
+    if(!m||m.type!=='match')return; // только матчи, без особых событий
+    const rows=prByMatch[mid];
+    const mine=rows.find(r=>String(r.user_id)===my&&Number(r.points)>0);
+    if(!mine)return;
+    const others=rows.filter(r=>String(r.user_id)!==my);
+    if(others.length>=2&&others.every(r=>Number(r.points)<=0)){
+      const label=m.team1+' — '+m.team2;
+      if(!unique||others.length>unique.others)unique={label,others:others.length};
+    }
+  });
+  if(unique)facts.push({icon:'🎯',text:'Ты <b>единственный</b>, кто угадал '+unique.label+' — остальные '+unique.others+' промахнулись!'});
+
+  // Кандидат 2: лучшая сборная — суммарные очки по матчам с её участием (мин. 2 матча)
+  const teamPts={};const teamCnt={};
+  allPreds.forEach(p=>{
+    if(String(p.user_id)!==my||p.points==null)return;
+    const m=matchById[p.match_id];
+    if(!m||m.type!=='match')return;
+    [m.team1,m.team2].forEach(t=>{
+      if(!t)return;
+      teamPts[t]=(teamPts[t]||0)+Number(p.points);
+      teamCnt[t]=(teamCnt[t]||0)+1;
+    });
+  });
+  // события плей-офф тоже привязываем к командам матча
+  allEp.forEach(p=>{
+    if(String(p.user_id)!==my||p.points==null)return;
+    const ev=evById[p.event_id];const m=ev?matchById[ev.match_id]:null;
+    if(!m)return;
+    [m.team1,m.team2].forEach(t=>{
+      if(!t)return;
+      teamPts[t]=(teamPts[t]||0)+Number(p.points);
+      teamCnt[t]=(teamCnt[t]||0)+1;
+    });
+  });
+  let bestTeam=null;
+  Object.keys(teamPts).forEach(t=>{
+    if(teamCnt[t]>=2&&(!bestTeam||teamPts[t]>teamPts[bestTeam]))bestTeam=t;
+  });
+  if(bestTeam&&teamPts[bestTeam]>0){
+    facts.push({icon:'⚽',text:'Лучше всего тебе давались ставки на матчи <b>'+bestTeam+'</b>: +'+Math.round(teamPts[bestTeam]*10)/10+' очков ('+teamCnt[bestTeam]+' ставок)'});
+  }
+
+  // Кандидат 3: количество точных счетов (только матчи)
+  const exact=allPreds.filter(p=>{
+    if(String(p.user_id)!==my||p.points==null)return false;
+    const m=matchById[p.match_id];
+    return m&&m.type==='match'&&Number(p.points)>=5; // 5 = точный счёт (10 при x2)
+  }).length;
+  facts.push({icon:'🎱',text:'Точных счетов за турнир: <b>'+exact+'</b>'});
+
+  // Запасные факты, если каких-то не хватило до трёх
+  if(facts.length<3){
+    const boosts=allEp.filter(p=>String(p.user_id)===my&&p.is_boost&&p.points!=null);
+    const bWin=boosts.filter(p=>Number(p.points)>0).length;
+    if(boosts.length>0)facts.push({icon:'⚡',text:'Молнии-бусты: <b>'+bWin+' из '+boosts.length+'</b> сыграли в плюс'});
+  }
+  if(facts.length<3){
+    const x2s=allPreds.filter(p=>{
+      if(String(p.user_id)!==my||!p.is_x2||p.points==null)return false;
+      const m=matchById[p.match_id];return m&&m.type==='match';
+    });
+    const xWin=x2s.filter(p=>Number(p.points)>0).length;
+    if(x2s.length>0)facts.push({icon:'🎲',text:'Ставки x2 на матчи: <b>'+xWin+' из '+x2s.length+'</b> в плюс'});
+  }
+  return facts.slice(0,3);
+}
+
+// ── График гонки: места участников по дням турнира (SVG bump chart) ───────────
+function buildRaceChart(allPreds,allEp,evById,matchById,nameOf){
+  try{
+    // День очков = дата дедлайна матча (Иерусалим)
+    function dayOf(mid){
+      const m=matchById[mid];
+      if(!m||!m.deadline)return null;
+      return new Date(m.deadline).toLocaleDateString('sv-SE',{timeZone:'Asia/Jerusalem'});
+    }
+    // Собираем: очки[user][day]
+    const byUserDay={};const daysSet=new Set();
+    allPreds.forEach(p=>{
+      if(p.points==null)return;
+      const d=dayOf(p.match_id);if(!d)return;
+      daysSet.add(d);
+      const u=String(p.user_id);
+      byUserDay[u]=byUserDay[u]||{};
+      byUserDay[u][d]=(byUserDay[u][d]||0)+Number(p.points);
+    });
+    allEp.forEach(p=>{
+      if(p.points==null)return;
+      const ev=evById[p.event_id];if(!ev)return;
+      const d=dayOf(ev.match_id);if(!d)return;
+      daysSet.add(d);
+      const u=String(p.user_id);
+      byUserDay[u]=byUserDay[u]||{};
+      byUserDay[u][d]=(byUserDay[u][d]||0)+Number(p.points);
+    });
+    const days=[...daysSet].sort();
+    const userIds=Object.keys(byUserDay);
+    if(days.length<2||userIds.length<2)return'';
+
+    // Накопительные суммы и места по дням
+    const cum={};userIds.forEach(u=>{cum[u]=[];let s=0;days.forEach(d=>{s+=byUserDay[u][d]||0;cum[u].push(s);});});
+    const ranks={};userIds.forEach(u=>ranks[u]=[]);
+    days.forEach((d,di)=>{
+      const order=[...userIds].sort((a,b)=>cum[b][di]-cum[a][di]||String(nameOf[a]||a).localeCompare(String(nameOf[b]||b)));
+      order.forEach((u,pos)=>ranks[u][di]=pos+1);
+    });
+
+    // SVG
+    const colors=['#f0b429','#2dd4bf','#f97316','#a855f7','#ef4444','#3b82f6','#84cc16','#ec4899','#14b8a6','#eab308'];
+    const N=userIds.length;
+    const stepX=Math.max(34,Math.min(60,320/days.length));
+    const padL=8,padR=76,padT=14,padB=26;
+    const W=padL+padR+stepX*(days.length-1);
+    const rowH=26;
+    const H=padT+padB+rowH*(N-1);
+    const X=i=>padL+i*stepX;
+    const Y=r=>padT+(r-1)*rowH;
+
+    let svg='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block">';
+    // Сетка мест
+    for(let r=1;r<=N;r++){
+      svg+='<text x="2" y="'+(Y(r)+3)+'" font-size="8" fill="#5a6b5a">'+r+'</text>';
+    }
+    // Подписи дней (каждый 2-й если тесно)
+    days.forEach((d,i)=>{
+      if(days.length>10&&i%2===1)return;
+      const lbl=d.slice(8,10)+'.'+d.slice(5,7);
+      svg+='<text x="'+X(i)+'" y="'+(H-8)+'" font-size="7.5" fill="#5a6b5a" text-anchor="middle">'+lbl+'</text>';
+    });
+    // Линии игроков
+    userIds.forEach((u,ui)=>{
+      const col=colors[ui%colors.length];
+      const pts=days.map((d,i)=>X(i)+','+Y(ranks[u][i])).join(' ');
+      const isMe=u===String(uid);
+      svg+='<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="'+(isMe?3:1.8)+'" stroke-linejoin="round" stroke-linecap="round" opacity="'+(isMe?1:0.75)+'"/>';
+      // точки
+      days.forEach((d,i)=>{svg+='<circle cx="'+X(i)+'" cy="'+Y(ranks[u][i])+'" r="'+(isMe?3:2.2)+'" fill="'+col+'"/>';});
+      // имя справа
+      const lastY=Y(ranks[u][days.length-1]);
+      const nm=(nameOf[u]||'?').split(' ')[0].slice(0,9);
+      svg+='<text x="'+(X(days.length-1)+7)+'" y="'+(lastY+3)+'" font-size="9" font-weight="'+(isMe?'800':'600')+'" fill="'+col+'">'+nm+(isMe?' 👈':'')+'</text>';
+    });
+    svg+='</svg>';
+    return'<div class="fin-chart-wrap"><div class="fin-chart-title">📈 Гонка за титул (место по дням)</div>'+svg+'</div>';
+  }catch(e){
+    console.error('raceChart',e);
+    return'';
+  }
+}
+
 // ── ТАБЫ ──────────────────────────────────────────────────────────────────────
 function switchTab(tab,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -1981,6 +2291,7 @@ function switchTab(tab,el){
   if(el)el.classList.add('active');document.getElementById('page-'+tab).classList.add('active');
   if(tab==='lb')loadLB();if(tab==='stats')loadStats();
   if(tab==='hist')renderHistory();
+  if(tab==='finals')renderFinals();
   if(tab==='admin'){renderAdminList();loadAdminStats();loadAdminUsers();}
 }
 let tt;
