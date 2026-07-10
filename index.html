@@ -2016,7 +2016,7 @@ function renderFinals(){
     el.innerHTML='<div class="fin-stub">'+
       '<div class="ic">🏗️</div>'+
       '<div class="t1">Итоги ещё готовятся</div>'+
-      '<div class="t2">Финал не сыгран — как только турнир завершится, здесь появятся твоё итоговое место, личная статистика и график гонки за победу 🏆</div>'+
+      '<div class="t2">Финал не сыгран — как только турнир завершится, заходи посмотреть 🏆</div>'+
       '<div style="font-size:36px;margin-top:24px">🐙</div>'+
       adminBtn+
       '</div>';
@@ -2124,7 +2124,13 @@ function computeFacts(allPreds,allEp,evById,matchById){
     const others=rows.filter(r=>String(r.user_id)!==my);
     if(others.length>=2&&others.every(r=>Number(r.points)<=0)){
       const ev=evById[evId];const m=ev?matchById[ev.match_id]:null;
-      const label=(ev?ev.label:'событие')+(m?' ('+m.team1+' — '+m.team2+')':'');
+      // Итог события словами: Да/Нет или название команды
+      let resStr='';
+      if(ev&&ev.result){
+        if(ev.kind==='binary')resStr=ev.result==='yes'?'Да':'Нет';
+        else resStr=ev.result==='team1'?(m?.team1||''):ev.result==='team2'?(m?.team2||''):'Ничья';
+      }
+      const label='«'+(ev?ev.label:'событие')+(resStr?': <b>'+resStr+'</b>':'')+'»'+(m?' в матче '+m.team1+' — '+m.team2:'');
       if(!unique||others.length>unique.others)unique={label,others:others.length};
     }
   });
@@ -2139,7 +2145,9 @@ function computeFacts(allPreds,allEp,evById,matchById){
     if(!mine)return;
     const others=rows.filter(r=>String(r.user_id)!==my);
     if(others.length>=2&&others.every(r=>Number(r.points)<=0)){
-      const label=m.team1+' — '+m.team2;
+      // Показываем результат матча (счёт), очищенный от служебной части после |
+      const resScore=m.result?String(m.result).split('|')[0]:'';
+      const label='результат матча '+m.team1+' — '+m.team2+(resScore?' <b>'+resScore+'</b>':'');
       if(!unique||others.length>unique.others)unique={label,others:others.length};
     }
   });
