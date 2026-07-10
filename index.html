@@ -549,6 +549,24 @@ async function sbRpc(fn,body){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function fmtTime(d){return new Date(d).toLocaleString('ru',{timeZone:'Asia/Jerusalem',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
+
+// ── ВРЕМЯ ПО ИЕРУСАЛИМУ ───────────────────────────────────────────────────────
+// datetime-local инпуты работают в местном времени Израиля, в базе храним UTC ISO
+function toJerusalemLocal(iso){
+  if(!iso)return'';
+  return new Date(iso).toLocaleString('sv-SE',{timeZone:'Asia/Jerusalem'}).slice(0,16).replace(' ','T');
+}
+function jerusalemToISO(localStr){
+  // localStr = "2026-07-09T22:30" в иерусалимском времени → UTC ISO
+  const naive=new Date(localStr+':00Z'); // сначала трактуем как UTC
+  const shownStr=naive.toLocaleString('sv-SE',{timeZone:'Asia/Jerusalem'}).replace(' ','T');
+  const shown=new Date(shownStr+'Z');
+  const offset=shown.getTime()-naive.getTime(); // на сколько Иерусалим впереди UTC в этот момент
+  return new Date(naive.getTime()-offset).toISOString();
+}
+
+// Дедлайн в базе = момент закрытия ставок (для матчей это "начало минус 5 минут",
+// сдвиг выполняется при импорте и разовым SQL для существующих матчей)
 function fmtDL(d){
   const dl=new Date(d),now=new Date(),diff=dl-now,h=diff/3600000;
   if(now>dl){
@@ -1154,6 +1172,8 @@ function rerenderCard(mid){
 }
 
 async function saveEvents(mid){
+  const _m=matches.find(x=>x.id==mid);
+  if(_m&&Date.now()>new Date(_m.deadline).getTime()){toast('⏰ Ставки на этот матч закрыты','err');return;}
   const btn=document.getElementById('save-ev-'+mid);
   if(btn){btn.textContent='Сохраняем...';btn.disabled=true;}
   const evs=matchEvents[mid]||[];
@@ -1185,6 +1205,8 @@ function toggleX2(mid){
 }
 
 async function save(mid,type){
+  const _m=matches.find(x=>x.id==mid);
+  if(_m&&Date.now()>new Date(_m.deadline).getTime()){toast('⏰ Ставки на этот матч закрыты','err');return;}
   if(saving[mid])return;
   let prediction;
   if(type==='match'){
@@ -1697,7 +1719,7 @@ function buildAdminCard(m){
       const dlStr=m.deadline?fmtTime(m.deadline):'?';
       const _grpM=m.type==='match'&&m.title?m.title.match(/Group ([A-L])/i):null;const grpAdmin=_grpM?_grpM[1]:null;
       const isKnockoutAdmin=m.type==='match'&&!grpAdmin;
-      const dlLocal=m.deadline?new Date(m.deadline).toISOString().slice(0,16):'';
+      const dlLocal=m.deadline?toJerusalemLocal(m.deadline):'';
       const t1=m.team1||'';const t2=m.team2||'';
       const titleDisplay=m.title||(t1&&t2?t1+' vs '+t2:'Матч '+m.id);
       const commonHead='<div class="admin-card" id="acard-'+m.id+'">'+
@@ -1902,8 +1924,8 @@ async function updateTitle(mid){
 async function updateDeadline(mid){
   const input=document.getElementById('dl-'+mid);
   if(!input||!input.value){toast('Выбери дату!','err');return;}
-  // Берём значение как локальное время (datetime-local всегда возвращает локальное)
-  const newDeadline=new Date(input.value).toISOString();
+  // Значение инпута — время по Иерусалиму, конвертируем в UTC для базы
+  const newDeadline=jerusalemToISO(input.value);
   const btn=input.nextElementSibling;
   if(btn){btn.textContent='...';btn.disabled=true;}
   const res=await fetchT(SB_URL+'/rest/v1/matches?id=eq.'+mid,{
@@ -1934,7 +1956,10 @@ async function importMatches(){
     const existing=new Set(matches.map(m=>m.title));let imported=0;
     for(const m of data.matches||[]){
       if(existing.has(m.title))continue;
-      await sbPost('matches',{title:m.title,team1:m.team1,team2:m.team2,deadline:m.deadline,type:'match',custom_points:2},'return=minimal');imported++;
+      // Apps Script отдаёт дедлайн "начало минус 30 мин"; добавляем 25 мин,
+      // чтобы ставки закрывались за 5 минут до начала матча
+      const dl5=new Date(new Date(m.deadline).getTime()+25*60000).toISOString();
+      await sbPost('matches',{title:m.title,team1:m.team1,team2:m.team2,deadline:dl5,type:'match',custom_points:2},'return=minimal');imported++;
     }
     toast('✅ Импортировано '+imported+'!','ok');await loadAll();
   }catch(e){toast('Ошибка: '+e.message,'err');}
@@ -1944,7 +1969,7 @@ async function addEvent(){
   const t1=document.getElementById('ev-t1').value.trim(),t2=document.getElementById('ev-t2').value.trim();
   const dl=document.getElementById('ev-dl').value,pts=parseInt(document.getElementById('ev-pts').value)||2;
   if(!title||!dl){toast('Заполни название и дедлайн!','err');return;}
-  const res=await sbPost('matches',{title:type==='match'?t1+' vs '+t2:title,team1:t1,team2:t2,deadline:new Date(dl).toISOString(),type,custom_points:pts},'return=minimal');
+  const res=await sbPost('matches',{title:type==='match'?t1+' vs '+t2:title,team1:t1,team2:t2,deadline:jerusalemToISO(dl),type,custom_points:pts},'return=minimal');
   if(res?.error)toast('Ошибка: '+res.error,'err');else{toast('✅ Добавлено!','ok');['ev-title','ev-t1','ev-t2','ev-dl'].forEach(id=>document.getElementById(id).value='');await loadAll();}
 }
 function toggleTeams(){document.getElementById('ev-teams').style.display=document.getElementById('ev-type').value==='match'?'flex':'none';}
