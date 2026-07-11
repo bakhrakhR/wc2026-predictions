@@ -2068,8 +2068,9 @@ async function loadFinals(){
     const myHits=myScored.filter(p=>Number(p.points)>0).length;
     const myPct=myScored.length?Math.round(myHits/myScored.length*100):0;
 
-    // ── Факты ──
-    const facts=computeFacts(allPreds,allEp,evById,matchById);
+    // ── Факты (пул, по 3 на страницу) ──
+    finalsFactsPool=computeAllFacts(allPreds,allEp,evById,matchById);
+    finalsFactPage=0;
 
     // ── График мест по дням ──
     const chartHtml=buildRaceChart(allPreds,allEp,evById,matchById,nameOf);
@@ -2097,9 +2098,14 @@ async function loadFinals(){
       '<div class="pct-item"><div class="v">'+(myRow?Math.round(Number(myRow.points)*10)/10:0)+'</div><div class="l">очков</div></div>'+
       '<div class="pct-item"><div class="v">'+myScored.length+'</div><div class="l">ставок</div></div>'+
       '</div></div>'+
-      (facts.length?'<div class="fin-chart-title">Твои моменты турнира</div>'+facts.map(f=>'<div class="fin-fact"><div class="fic">'+f.icon+'</div><div class="ft">'+f.text+'</div></div>').join(''):'')+
+      (finalsFactsPool.length?
+        '<div class="fin-chart-title">Твои моменты турнира</div>'+
+        '<div id="fin-facts"></div>'+
+        (finalsFactsPool.length>3?'<button class="admin-btn grey sm" style="width:100%;margin:2px 0 12px" onclick="moreFacts()">🔄 Ещё фактов</button>':'')
+        :'')+
       chartHtml+
       tableHtml;
+    renderFactsPage();
     finalsLoaded=true;
   }catch(e){
     console.error('finals',e);
@@ -2107,14 +2113,20 @@ async function loadFinals(){
   }
 }
 
-// ── 3 факта из реальных данных (без придумывания) ─────────────────────────────
-function computeFacts(allPreds,allEp,evById,matchById){
+// ── ПУЛ ФАКТОВ из реальных данных (без придумывания). Только матчи. ───────────
+function computeAllFacts(allPreds,allEp,evById,matchById){
   const facts=[];
   const my=String(uid);
 
-  // Кандидат 1: "Ты один угадал X" — событие/матч, где я в плюсе, а ВСЕ остальные поставившие в нуле/минусе
+  // Мои рассчитанные ставки на МАТЧИ (обычные) и события плей-офф
+  const myMatchPreds=allPreds.filter(p=>{
+    if(String(p.user_id)!==my||p.points==null)return false;
+    const m=matchById[p.match_id];return m&&m.type==='match';
+  });
+  const myEvPreds=allEp.filter(p=>String(p.user_id)===my&&p.points!=null);
+
+  // ── 1. Ты единственный угадал X (матчи + события плей-офф) ──
   let unique=null;
-  // по событиям плей-офф
   const epByEvent={};
   allEp.forEach(p=>{if(p.points==null)return;(epByEvent[p.event_id]=epByEvent[p.event_id]||[]).push(p);});
   Object.keys(epByEvent).forEach(evId=>{
@@ -2124,7 +2136,6 @@ function computeFacts(allPreds,allEp,evById,matchById){
     const others=rows.filter(r=>String(r.user_id)!==my);
     if(others.length>=2&&others.every(r=>Number(r.points)<=0)){
       const ev=evById[evId];const m=ev?matchById[ev.match_id]:null;
-      // Итог события словами: Да/Нет или название команды
       let resStr='';
       if(ev&&ev.result){
         if(ev.kind==='binary')resStr=ev.result==='yes'?'Да':'Нет';
@@ -2134,18 +2145,16 @@ function computeFacts(allPreds,allEp,evById,matchById){
       if(!unique||others.length>unique.others)unique={label,others:others.length};
     }
   });
-  // по обычным матчам/спец-событиям
   const prByMatch={};
   allPreds.forEach(p=>{if(p.points==null)return;(prByMatch[p.match_id]=prByMatch[p.match_id]||[]).push(p);});
   Object.keys(prByMatch).forEach(mid=>{
     const m=matchById[mid];
-    if(!m||m.type!=='match')return; // только матчи, без особых событий
+    if(!m||m.type!=='match')return;
     const rows=prByMatch[mid];
     const mine=rows.find(r=>String(r.user_id)===my&&Number(r.points)>0);
     if(!mine)return;
     const others=rows.filter(r=>String(r.user_id)!==my);
     if(others.length>=2&&others.every(r=>Number(r.points)<=0)){
-      // Показываем результат матча (счёт), очищенный от служебной части после |
       const resScore=m.result?String(m.result).split('|')[0]:'';
       const label='результат матча '+m.team1+' — '+m.team2+(resScore?' <b>'+resScore+'</b>':'');
       if(!unique||others.length>unique.others)unique={label,others:others.length};
@@ -2153,60 +2162,124 @@ function computeFacts(allPreds,allEp,evById,matchById){
   });
   if(unique)facts.push({icon:'🎯',text:'Ты <b>единственный</b>, кто угадал '+unique.label+' — остальные '+unique.others+' промахнулись!'});
 
-  // Кандидат 2: лучшая сборная — суммарные очки по матчам с её участием (мин. 2 матча)
+  // ── 2/10. Лучшая и сложная сборная ──
   const teamPts={};const teamCnt={};
-  allPreds.forEach(p=>{
-    if(String(p.user_id)!==my||p.points==null)return;
-    const m=matchById[p.match_id];
-    if(!m||m.type!=='match')return;
+  function addTeamPts(m,pts){
     [m.team1,m.team2].forEach(t=>{
       if(!t)return;
-      teamPts[t]=(teamPts[t]||0)+Number(p.points);
+      teamPts[t]=(teamPts[t]||0)+pts;
       teamCnt[t]=(teamCnt[t]||0)+1;
     });
-  });
-  // события плей-офф тоже привязываем к командам матча
-  allEp.forEach(p=>{
-    if(String(p.user_id)!==my||p.points==null)return;
-    const ev=evById[p.event_id];const m=ev?matchById[ev.match_id]:null;
-    if(!m)return;
-    [m.team1,m.team2].forEach(t=>{
-      if(!t)return;
-      teamPts[t]=(teamPts[t]||0)+Number(p.points);
-      teamCnt[t]=(teamCnt[t]||0)+1;
-    });
-  });
-  let bestTeam=null;
-  Object.keys(teamPts).forEach(t=>{
-    if(teamCnt[t]>=2&&(!bestTeam||teamPts[t]>teamPts[bestTeam]))bestTeam=t;
-  });
-  if(bestTeam&&teamPts[bestTeam]>0){
-    facts.push({icon:'⚽',text:'Лучше всего тебе давались ставки на матчи <b>'+bestTeam+'</b>: +'+Math.round(teamPts[bestTeam]*10)/10+' очков ('+teamCnt[bestTeam]+' ставок)'});
   }
+  myMatchPreds.forEach(p=>addTeamPts(matchById[p.match_id],Number(p.points)));
+  myEvPreds.forEach(p=>{
+    const ev=evById[p.event_id];const m=ev?matchById[ev.match_id]:null;
+    if(m)addTeamPts(m,Number(p.points));
+  });
+  let bestTeam=null,hardTeam=null;
+  Object.keys(teamPts).forEach(t=>{
+    if(teamCnt[t]<2)return;
+    if(!bestTeam||teamPts[t]>teamPts[bestTeam])bestTeam=t;
+    if(!hardTeam||teamPts[t]<teamPts[hardTeam])hardTeam=t;
+  });
+  if(bestTeam&&teamPts[bestTeam]>0)
+    facts.push({icon:'⚽',text:'Лучше всего тебе давались ставки на матчи <b>'+bestTeam+'</b>: +'+Math.round(teamPts[bestTeam]*10)/10+' очков ('+teamCnt[bestTeam]+' ставок)'});
 
-  // Кандидат 3: количество точных счетов (только матчи)
-  const exact=allPreds.filter(p=>{
-    if(String(p.user_id)!==my||p.points==null)return false;
-    const m=matchById[p.match_id];
-    return m&&m.type==='match'&&Number(p.points)>=5; // 5 = точный счёт (10 при x2)
-  }).length;
+  // ── 3. Точные счета ──
+  const exact=myMatchPreds.filter(p=>Number(p.points)>=5).length;
   facts.push({icon:'🎱',text:'Точных счетов за турнир: <b>'+exact+'</b>'});
 
-  // Запасные факты, если каких-то не хватило до трёх
-  if(facts.length<3){
-    const boosts=allEp.filter(p=>String(p.user_id)===my&&p.is_boost&&p.points!=null);
-    const bWin=boosts.filter(p=>Number(p.points)>0).length;
-    if(boosts.length>0)facts.push({icon:'⚡',text:'Молнии-бусты: <b>'+bWin+' из '+boosts.length+'</b> сыграли в плюс'});
+  // ── 4. Самый урожайный матч ──
+  const perMatch={};
+  myMatchPreds.forEach(p=>{perMatch[p.match_id]=(perMatch[p.match_id]||0)+Number(p.points);});
+  myEvPreds.forEach(p=>{
+    const ev=evById[p.event_id];if(!ev)return;
+    perMatch[ev.match_id]=(perMatch[ev.match_id]||0)+Number(p.points);
+  });
+  let bestMid=null;
+  Object.keys(perMatch).forEach(mid=>{if(bestMid===null||perMatch[mid]>perMatch[bestMid])bestMid=mid;});
+  if(bestMid!==null&&perMatch[bestMid]>0){
+    const m=matchById[bestMid];
+    if(m){
+      const resScore=m.result?' ('+String(m.result).split('|')[0]+')':'';
+      facts.push({icon:'💰',text:'Больше всего очков принёс матч <b>'+m.team1+' — '+m.team2+'</b>'+resScore+': +'+Math.round(perMatch[bestMid]*10)/10});
+    }
   }
-  if(facts.length<3){
-    const x2s=allPreds.filter(p=>{
-      if(String(p.user_id)!==my||!p.is_x2||p.points==null)return false;
-      const m=matchById[p.match_id];return m&&m.type==='match';
-    });
+
+  // ── 5. Ставки x2 ──
+  const x2s=myMatchPreds.filter(p=>p.is_x2);
+  if(x2s.length>0){
     const xWin=x2s.filter(p=>Number(p.points)>0).length;
-    if(x2s.length>0)facts.push({icon:'🎲',text:'Ставки x2 на матчи: <b>'+xWin+' из '+x2s.length+'</b> в плюс'});
+    const xPct=Math.round(xWin/x2s.length*100);
+    facts.push({icon:'🎲',text:'Ставок с удвоением: <b>'+x2s.length+'</b>, успешных — <b>'+xPct+'%</b> ('+xWin+' шт.)'});
   }
-  return facts.slice(0,3);
+
+  // ── 6. Молнии-бусты ──
+  const boosts=myEvPreds.filter(p=>p.is_boost);
+  if(boosts.length>0){
+    const bWin=boosts.filter(p=>Number(p.points)>0).length;
+    facts.push({icon:'⚡',text:'Молнии-бусты: <b>'+bWin+' из '+boosts.length+'</b> сыграли в плюс'});
+  }
+
+  // ── 7. Лучший день ──
+  function dayOfMatch(mid){
+    const m=matchById[mid];
+    if(!m||!m.deadline)return null;
+    return new Date(m.deadline).toLocaleDateString('sv-SE',{timeZone:'Asia/Jerusalem'});
+  }
+  const byDay={};
+  myMatchPreds.forEach(p=>{const d=dayOfMatch(p.match_id);if(d)byDay[d]=(byDay[d]||0)+Number(p.points);});
+  myEvPreds.forEach(p=>{const ev=evById[p.event_id];const d=ev?dayOfMatch(ev.match_id):null;if(d)byDay[d]=(byDay[d]||0)+Number(p.points);});
+  let bestDay=null;
+  Object.keys(byDay).forEach(d=>{if(!bestDay||byDay[d]>byDay[bestDay])bestDay=d;});
+  if(bestDay&&byDay[bestDay]>0){
+    const lbl=bestDay.slice(8,10)+'.'+bestDay.slice(5,7);
+    facts.push({icon:'🔥',text:'Твой лучший день — <b>'+lbl+'</b>: +'+Math.round(byDay[bestDay]*10)/10+' очков за день'});
+  }
+
+  // ── 8. Самая длинная серия угаданных подряд ──
+  const chrono=[];
+  myMatchPreds.forEach(p=>{const m=matchById[p.match_id];chrono.push({t:new Date(m.deadline).getTime(),win:Number(p.points)>0});});
+  myEvPreds.forEach(p=>{
+    const ev=evById[p.event_id];const m=ev?matchById[ev.match_id]:null;
+    if(m)chrono.push({t:new Date(m.deadline).getTime()+(ev.sort_order||0),win:Number(p.points)>0});
+  });
+  chrono.sort((a,b)=>a.t-b.t);
+  let bestStreak=0,cur=0;
+  chrono.forEach(x=>{if(x.win){cur++;if(cur>bestStreak)bestStreak=cur;}else cur=0;});
+  if(bestStreak>=3)
+    facts.push({icon:'📈',text:'Самая длинная серия: <b>'+bestStreak+'</b> угаданных ставок подряд'});
+
+  // ── 9. Угаданные ничьи ──
+  const draws=myMatchPreds.filter(p=>{
+    const m=matchById[p.match_id];
+    if(!m||!m.result||Number(p.points)<=0)return false;
+    const sc=String(m.result).split('|')[0].split(':');
+    return sc.length===2&&sc[0].trim()!==''&&sc[0].trim()===sc[1].trim();
+  }).length;
+  if(draws>0)
+    facts.push({icon:'🤝',text:'Угаданных ничьих: <b>'+draws+'</b> — самый неочевидный исход!'});
+
+  // ── 10. Сложная сборная ──
+  if(hardTeam&&hardTeam!==bestTeam&&teamPts[hardTeam]<0)
+    facts.push({icon:'😤',text:'Труднее всего давались матчи <b>'+hardTeam+'</b>: '+Math.round(teamPts[hardTeam]*10)/10+' очков ('+teamCnt[hardTeam]+' ставок)'});
+
+  return facts;
+}
+
+// ── Пейджинг фактов (по 3 на страницу, кнопка "Ещё фактов") ───────────────────
+let finalsFactsPool=[],finalsFactPage=0;
+function renderFactsPage(){
+  const box=document.getElementById('fin-facts');
+  if(!box)return;
+  const pages=Math.max(1,Math.ceil(finalsFactsPool.length/3));
+  finalsFactPage=finalsFactPage%pages;
+  const chunk=finalsFactsPool.slice(finalsFactPage*3,finalsFactPage*3+3);
+  box.innerHTML=chunk.map(f=>'<div class="fin-fact"><div class="fic">'+f.icon+'</div><div class="ft">'+f.text+'</div></div>').join('');
+}
+function moreFacts(){
+  finalsFactPage++;
+  renderFactsPage();
 }
 
 // ── График гонки: места участников по дням турнира (SVG bump chart) ───────────
