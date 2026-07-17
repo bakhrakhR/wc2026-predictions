@@ -311,6 +311,14 @@ select.add-input{cursor:pointer;}
 .mev-oth-chip .oa.a-t2{color:var(--coral);}
 .mev-oth-chip .oa.a-draw{color:var(--gold);}
 .mev-rules{font-size:10px;color:var(--muted);padding:4px 14px 8px;line-height:1.5;}
+/* ── БАНК-СТАВКИ ── */
+.bank-banner{background:linear-gradient(135deg,#2a1f0a,#1f1708);border:1.5px solid var(--gold);border-radius:12px;padding:10px 12px;margin:0 14px 4px;font-size:11px;line-height:1.5;color:var(--text);}
+.bank-banner b{color:var(--gold);}
+.bank-stake{width:74px;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;padding:6px 8px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:12px;font-weight:700;color:var(--text);text-align:center;}
+.bank-stake:focus{border-color:var(--gold);outline:none;}
+.bank-stake:disabled{opacity:0.5;}
+.bank-row{display:flex;align-items:center;gap:6px;margin-top:6px;}
+.bank-row .bl{font-size:10px;color:var(--muted);}
 /* ── WINNER PICK ── */
 .winner-pick{padding:10px 14px 6px;border-top:1px solid var(--border);background:#0f1e10;}
 .winner-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;text-align:center;}
@@ -526,13 +534,16 @@ const BOT_USERNAME='Kubikpresa_bot';
 // true = все кроме админа видят заглушку (для тестирования)
 // false = обычная работа для всех
 // Переключи на false и перезалей index.html когда тестирование закончено.
-const MAINTENANCE_MODE=false;
+const MAINTENANCE_MODE=true;
 
 // ── ИТОГИ ТУРНИРА ─────────────────────────────────────────────────────────────
 // false = вкладка "Итоги" показывает заглушку (финал не сыгран)
 // true  = показывает полные итоги: место, факты, таблицу, график мест по дням.
 // После финала: поменяй на true и перезалей index.html.
 const TOURNAMENT_OVER=false;
+// true = вкладка "Итоги" открыта всем УЖЕ СЕЙЧАС (с заголовком "это ещё не финал"),
+// после завершения турнира переключи TOURNAMENT_OVER на true — заголовок сменится на финальный.
+const FINALS_OPEN=true;
 
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 // fetchT — fetch с таймаутом. Без него зависшие запросы (частый эффект нестабильной
@@ -646,6 +657,8 @@ function mkTeamAvatar(name,color){
 let tg; // будет установлен после загрузки telegram-web-app.js (см. initTelegram)
 let uid,uname,matches=[],preds={},lb=[],matchPreds={};
 let matchEvents={},eventPreds={},eventPicks={};
+let myBankBase=0,myBankMax=0;
+let doneSpoilerOpen=false; // состояние спойлера "Завершено" во вкладке матчей // банк игрока и лимит на одно событие (5%)
 let activeGroup='all',activeSubTab='matches',activeTimeFilter='soon',activeEventFilter='open',activeHistTab='matches',saving={},clearing={};
 let lbLoaded=false,statsLoaded=false;
 
@@ -778,13 +791,19 @@ function showApp(){
 }
 
 async function loadAll(){
-  const[matchRes,predRes,lbRes,evRes,epRes]=await Promise.all([
+  const[matchRes,predRes,lbRes,evRes,epRes,bankRes]=await Promise.all([
     sbGet('matches','?select=*&order=id'),
     sbGet('predictions','?user_id=eq.'+uid+'&select=*'),
     sbGet('leaderboard','?select=*'),
     sbGet('match_events','?select=*&order=sort_order'),
-    sbGet('event_predictions','?user_id=eq.'+uid+'&select=*')
+    sbGet('event_predictions','?user_id=eq.'+uid+'&select=*'),
+    sbGet('bankroll_base','?user_id=eq.'+uid+'&select=*')
   ]);
+  // Банк игрока (если таблица ещё не создана — просто 0, без ошибок)
+  if(Array.isArray(bankRes)&&bankRes.length){
+    myBankBase=Number(bankRes[0].base_points)||0;
+    myBankMax=Math.round(myBankBase*0.05);
+  }
   if(matchRes?.error || predRes?.error || lbRes?.error){
     toast('⚠️ Проблема с соединением, потяни вниз чтобы обновить','err');
   }
@@ -800,7 +819,7 @@ async function loadAll(){
   // Свои ставки на события
   eventPicks={};
   (Array.isArray(epRes)?epRes:[]).forEach(ep=>{
-    eventPicks[ep.event_id]={answer:ep.answer,is_boost:ep.is_boost,points:ep.points};
+    eventPicks[ep.event_id]={answer:ep.answer,is_boost:ep.is_boost,points:ep.points,stake:ep.stake};
   });
   updateScore(lb);buildFilters();renderMatches();renderHistory();try{renderLB(lb);}catch(e){console.error('renderLB',e);}
   if(ADMIN_IDS.includes(uid))loadAdminStats();
@@ -897,11 +916,24 @@ function renderMatches(){
       activeTimeFilter==='soon'?'Нет матчей в ближайшие 3 дня — переключи на «Все»':'Нет активных матчей';
     el.innerHTML='<div class="empty"><div class="empty-ic">📅</div><div>'+msg+'</div></div>';return;
   }
-  el.innerHTML=vis.map(m=>{
+  function safeCard(m){
     try{return buildCard(m);}
     catch(e){console.error('buildCard error',m.id,e.message);
       return '<div class="match-card" style="padding:12px;color:var(--red)">⚠️ '+m.title+' (ошибка)</div>';}
-  }).join('');
+  }
+  if(activeSubTab==='matches'){
+    // Банк-матчи (3-е место, финал) — сверху; всё остальное — под спойлер "Завершено"
+    const bank=vis.filter(m=>m.is_bankroll);
+    const rest=vis.filter(m=>!m.is_bankroll);
+    let html=bank.map(safeCard).join('');
+    if(rest.length){
+      html+='<div class="collapse-head '+(doneSpoilerOpen?'open':'')+'" onclick="toggleDoneSpoiler(this)"><span>📦 Завершено ('+rest.length+')</span><span class="arr">▼</span></div>'+
+        '<div class="collapse-body '+(doneSpoilerOpen?'open':'')+'" id="done-spoiler">'+rest.map(safeCard).join('')+'</div>';
+    }
+    el.innerHTML=html||'<div class="empty"><div class="empty-ic">📅</div><div>Нет матчей</div></div>';
+  } else {
+    el.innerHTML=vis.map(safeCard).join('');
+  }
   setTimeout(initFlagErrors,50);
 }
 
@@ -911,6 +943,10 @@ function buildCard(m){
   const grp=getGroup(m);
   const isKnockout=m.type==='match'&&!grp;
 
+  // БАНК-МАТЧ (3-е место / финал) → ставки очками
+  if(m.is_bankroll){
+    return buildBankrollCard(m,locked,dlTxt,dlCls);
+  }
   // ПЛЕЙ-ОФФ МАТЧ → рендерим события вместо счёта
   if(isKnockout){
     return buildKnockoutCard(m,locked,dlTxt,dlCls);
@@ -988,6 +1024,145 @@ function buildCard(m){
   return'<div class="match-card '+(p?'has-pred':'')+' '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+' '+(m.type==='special'?'special-card':'')+'" id="card-'+m.id+'">'+
     '<div class="match-header"><div class="match-group">'+headerLabel+'</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
     body+resHtml+predInfo+othersHtml+bottom+'</div>';
+}
+
+// ── КАРТОЧКА БАНК-МАТЧА (ставки очками, без бустов) ───────────────────────────
+function buildBankrollCard(m,locked,dlTxt,dlCls){
+  const c1=teamColor(m.team1),c2=teamColor(m.team2);
+  const evs=matchEvents[m.id];
+  const headerFlags='<div class="score-row" style="padding-bottom:8px">'+
+    '<div class="team-block">'+mkTeamAvatar(m.team1,c1)+'<div class="team-name">'+m.team1+'</div></div>'+
+    '<div class="score-sep" style="padding:0 4px 8px">vs</div>'+
+    '<div class="team-block">'+mkTeamAvatar(m.team2,c2)+'<div class="team-name">'+m.team2+'</div></div>'+
+    '</div>';
+
+  let banner='';
+  if(!locked){
+    // Сумма уже введённых ставок по этому матчу
+    let placed=0;
+    (evs||[]).forEach(ev=>{const pk=eventPicks[ev.id];if(pk&&pk.answer&&pk.stake)placed+=Number(pk.stake)||0;});
+    banner='<div class="bank-banner">💰 Твой банк: <b>'+myBankBase+'</b> очков · Макс на событие: <b>'+myBankMax+'</b>'+
+      ' · Поставлено тут: <b>'+placed+'</b><br>Угадал — ставка плюсом, ошибся — минусом. Пропуск = 0.</div>';
+  }
+
+  let eventsHtml='';
+  if(evs===undefined){
+    eventsHtml='<div class="mev-list"><div style="text-align:center;padding:14px"><div class="spin" style="width:20px;height:20px;margin:0 auto"></div></div></div>';
+    loadMatchEvents(m.id);
+  } else if(evs===null||evs.length===0){
+    eventsHtml='<div class="mev-rules">События ещё не заданы администратором</div>';
+  } else {
+    eventsHtml='<div class="mev-list">'+evs.map(ev=>buildBankrollRow(ev,m,locked)).join('')+'</div>';
+  }
+
+  let othersHint='';
+  if(locked&&evs&&evs.length){
+    if(knockoutAllPreds[m.id]===undefined)loadKnockoutAllPreds(m.id);
+    othersHint='<div class="mev-rules" style="padding-top:2px">Тапни на событие, чтобы увидеть ставки игроков</div>';
+  }
+
+  const bottom=!locked&&evs&&evs.length?'<div class="card-bottom">'+
+    '<button class="save-btn" id="save-ev-'+m.id+'" onclick="saveBankroll('+m.id+')" style="margin-left:0;width:100%">✓ Сохранить ставки</button>'+
+    '</div>':'';
+
+  return'<div class="match-card '+(locked?'locked':'')+' '+(dlCls==='live'?'is-live':'')+'" id="card-'+m.id+'">'+
+    '<div class="match-header"><div class="match-group">🎰 '+(m.title||'Банк-матч')+'</div><div class="match-time '+dlCls+'">'+dlTxt+'</div></div>'+
+    headerFlags+banner+eventsHtml+othersHint+bottom+'</div>';
+}
+
+// ── СТРОКА БАНК-СОБЫТИЯ: ответ + поле ставки, без молний ──────────────────────
+function buildBankrollRow(ev,m,locked){
+  const pick=eventPicks[ev.id];
+  const hasResult=ev.result!=null&&ev.result!=='';
+  const ans=pick?.answer||'';
+
+  // После дедлайна — компактный вид со спойлером (как у обычных плей-офф событий)
+  if(locked){
+    const{sqs,spoiler}=evOthersHtml(ev,m);
+    const myAns=ans?'<span class="oa '+aClass(ev,ans)+'" style="font-size:12px;font-weight:800">'+evAnswerLabel(ev,m,ans)+'</span>':'<span style="color:var(--muted);font-size:11px">пропуск</span>';
+    const stakeStr=pick&&pick.stake?'<span style="font-size:10px;color:var(--gold)"> ('+pick.stake+')</span>':'';
+    const myPts=pick&&pick.points!=null?'<span style="font-weight:800;color:'+(Number(pick.points)>0?'var(--green)':'var(--red)')+'">'+(Number(pick.points)>0?'+':'')+pick.points+'</span>':'';
+    let resLine='';
+    if(hasResult)resLine='<span class="mev-res">Итог: '+evAnswerLabel(ev,m,ev.result)+'</span>';
+    return'<div class="mev-outcome mev-row-locked" onclick="toggleEvOthers('+ev.id+')">'+
+      '<div class="mev-outcome-label" style="margin-bottom:2px"><span style="flex:1">'+ev.label+stakeStr+'</span>'+myAns+myPts+'</div>'+
+      resLine+sqs+spoiler+'</div>';
+  }
+
+  // Кнопки ответа
+  let btns='';
+  if(ev.kind==='advance'||ev.kind==='outcome'){
+    const isAdv=ev.kind==='advance';
+    const o1=ans==='team1'?'out-active':'';
+    const od=ans==='draw'?'out-active':'';
+    const o2=ans==='team2'?'out-active':'';
+    btns='<div class="mev-outcome-btns">'+
+      '<button class="mev-out-btn '+o1+'" onclick="pickOutcome('+ev.id+',\'team1\','+m.id+')">'+m.team1+'</button>'+
+      (isAdv?'':'<button class="mev-out-btn '+od+'" onclick="pickOutcome('+ev.id+',\'draw\','+m.id+')">Ничья</button>')+
+      '<button class="mev-out-btn '+o2+'" onclick="pickOutcome('+ev.id+',\'team2\','+m.id+')">'+m.team2+'</button>'+
+      '</div>';
+  } else {
+    const yesCls=ans==='yes'?'yes-active':'';
+    const noCls=ans==='no'?'no-active':'';
+    btns='<div class="mev-toggle" style="justify-content:flex-end">'+
+      '<button class="mev-btn '+yesCls+'" onclick="pickBinary('+ev.id+',\'yes\','+m.id+')">Да</button>'+
+      '<button class="mev-btn '+noCls+'" onclick="pickBinary('+ev.id+',\'no\','+m.id+')">Нет</button>'+
+      '</div>';
+  }
+
+  // Поле ставки: активно только если выбран ответ
+  const stakeVal=pick&&pick.stake!=null?pick.stake:'';
+  const stakeRow='<div class="bank-row">'+
+    '<span class="bl">Ставка:</span>'+
+    '<input class="bank-stake" type="number" min="1" max="'+myBankMax+'" step="1" '+
+    'placeholder="Макс '+myBankMax+'" value="'+stakeVal+'" '+
+    (ans?'':'disabled ')+
+    'oninput="bankStakeInput('+ev.id+',this.value)">'+
+    '</div>';
+
+  return'<div class="mev-outcome">'+
+    '<div class="mev-outcome-label">'+ev.label+'</div>'+
+    btns+stakeRow+'</div>';
+}
+
+// Ввод ставки: пишем в состояние, чтобы значение пережило перерисовку карточки
+function bankStakeInput(eventId,val){
+  const pk=eventPicks[eventId];
+  if(!pk)return;
+  const n=parseInt(val);
+  pk.stake=isNaN(n)?null:n;
+}
+
+// ── СОХРАНЕНИЕ БАНК-СТАВОК ────────────────────────────────────────────────────
+async function saveBankroll(mid){
+  const evs=matchEvents[mid]||[];
+  // Валидация ДО отправки: у каждого выбранного ответа должна быть корректная ставка
+  for(const ev of evs){
+    const pk=eventPicks[ev.id];
+    if(pk&&pk.answer){
+      const s=Number(pk.stake);
+      if(!pk.stake||isNaN(s)||s<1||s!==Math.round(s)){toast('«'+ev.label+'»: укажи ставку (целое число от 1)','err');return;}
+      if(s>myBankMax){toast('«'+ev.label+'»: максимум '+myBankMax+' очков','err');return;}
+    }
+  }
+  const btn=document.getElementById('save-ev-'+mid);
+  if(btn){btn.textContent='Сохраняем...';btn.disabled=true;}
+  let saved=0,errors=0;
+  for(const ev of evs){
+    const pk=eventPicks[ev.id];
+    if(pk&&pk.answer&&pk.stake){
+      const res=await sbRpc('upsert_bankroll_prediction',{p_event_id:ev.id,p_user_id:uid,p_answer:pk.answer,p_stake:Number(pk.stake)});
+      if(res?.error){errors++;toast(ev.label+': '+res.error,'err');}
+      else{saved++;pk.points=null;}
+    } else {
+      await sbRpc('clear_event_prediction',{p_event_id:ev.id,p_user_id:uid});
+      delete (eventPicks[ev.id]||{}).stake;
+    }
+  }
+  if(btn){btn.textContent='✓ Сохранить ставки';btn.disabled=false;}
+  if(errors===0)toast('✅ Банк-ставки сохранены ('+saved+')','ok');
+  rerenderCard(mid);
+  renderHistory();
 }
 
 // ── КАРТОЧКА ПЛЕЙ-ОФФ (список событий) ───────────────────────────────────────
@@ -1068,7 +1243,8 @@ function evOthersHtml(ev,m){
   const spoiler='<div class="mev-others" id="evoth-'+ev.id+'">'+evPreds.map(p=>{
     const pts=p.points!=null?Number(p.points):null;
     const ptsStr=pts!=null?'<span style="font-weight:800;color:'+(pts>0?'var(--green)':'var(--red)')+'">'+(pts>0?'+':'')+pts+'</span>':'';
-    return'<div class="mev-oth-chip"><span class="on">'+p.name+'</span><span class="oa '+aClass(ev,p.answer)+'">'+evAnswerLabel(ev,m,p.answer)+'</span>'+(p.is_boost?'<span style="color:#c084fc">⚡</span>':'')+ptsStr+'</div>';
+    const stk=p.stake!=null?'<span style="color:var(--gold);font-size:9px">('+p.stake+')</span>':'';
+    return'<div class="mev-oth-chip"><span class="on">'+p.name+'</span><span class="oa '+aClass(ev,p.answer)+'">'+evAnswerLabel(ev,m,p.answer)+'</span>'+stk+(p.is_boost?'<span style="color:#c084fc">⚡</span>':'')+ptsStr+'</div>';
   }).join('')+'</div>';
   return{sqs,spoiler};
 }
@@ -1161,7 +1337,7 @@ async function loadMatchEvents(mid){
     const ids=matchEvents[mid].map(e=>e.id).join(',');
     const predRes=await sbGet('event_predictions','?event_id=in.('+ids+')&user_id=eq.'+uid+'&select=*');
     if(Array.isArray(predRes)){
-      predRes.forEach(ep=>{eventPicks[ep.event_id]={answer:ep.answer,is_boost:ep.is_boost,points:ep.points};});
+      predRes.forEach(ep=>{eventPicks[ep.event_id]={answer:ep.answer,is_boost:ep.is_boost,points:ep.points,stake:ep.stake};});
     }
   }
   const card=document.getElementById('card-'+mid);const m=matches.find(m=>m.id==mid);
@@ -1717,6 +1893,13 @@ async function manualAccept(predId, pts, btn){
   if(Array.isArray(lbRes)){lb=lbRes;renderLB(lb);updateScore(lb);}
 }
 
+function toggleDoneSpoiler(head){
+  doneSpoilerOpen=!doneSpoilerOpen;
+  const body=document.getElementById('done-spoiler');
+  if(body)body.classList.toggle('open',doneSpoilerOpen);
+  head.classList.toggle('open',doneSpoilerOpen);
+}
+
 function toggleCollapse(id,head){
   const body=document.getElementById(id);
   if(!body)return;
@@ -2008,7 +2191,7 @@ let finalsLoaded=false,finalsPreview=false;
 function renderFinals(){
   const el=document.getElementById('finals-content');
   if(!el)return;
-  if(!TOURNAMENT_OVER&&!finalsPreview){
+  if(!TOURNAMENT_OVER&&!FINALS_OPEN&&!finalsPreview){
     // Кнопка предпросмотра — видна только админу, у остальных просто заглушка
     const adminBtn=ADMIN_IDS.includes(uid)
       ?'<button class="admin-btn grey sm" style="margin-top:26px" onclick="previewFinals()">👁 Предпросмотр итогов (видно только тебе)</button>'
@@ -2088,11 +2271,14 @@ async function loadFinals(){
           '</div>';
       }).join('');
 
+    const heroTitle=TOURNAMENT_OVER
+      ?'🏆 Турнир завершён!'
+      :'🔥 Это ещё не финал, но ты уже хорошо поработал — вот немного о твоих успехах';
     el.innerHTML=
       '<div class="fin-hero">'+
-      '<div style="font-size:13px;color:var(--muted);margin-bottom:8px">🏆 Турнир завершён!</div>'+
+      '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;line-height:1.4">'+heroTitle+'</div>'+
       (myPlace?'<div class="place">'+(medals[myPlace-1]||'#'+myPlace)+'</div>'+
-        '<div class="place-sub">твоё итоговое место'+(myPlace===1?' — ЧЕМПИОН! 🎉':'')+'</div>':'')+
+        '<div class="place-sub">'+(TOURNAMENT_OVER?'твоё итоговое место'+(myPlace===1?' — ЧЕМПИОН! 🎉':''):'твоё текущее место')+'</div>':'')+
       '<div class="pct-row">'+
       '<div class="pct-item"><div class="v">'+myPct+'%</div><div class="l">угадано</div></div>'+
       '<div class="pct-item"><div class="v">'+(myRow?Math.round(Number(myRow.points)*10)/10:0)+'</div><div class="l">очков</div></div>'+
@@ -2123,12 +2309,17 @@ function computeAllFacts(allPreds,allEp,evById,matchById){
     if(String(p.user_id)!==my||p.points==null)return false;
     const m=matchById[p.match_id];return m&&m.type==='match';
   });
-  const myEvPreds=allEp.filter(p=>String(p.user_id)===my&&p.points!=null);
+  // Банк-события исключаем из обычных категорий — по ним будут отдельные факты
+  function isBankEv(p){
+    const ev=evById[p.event_id];const m=ev?matchById[ev.match_id]:null;
+    return !!(m&&m.is_bankroll);
+  }
+  const myEvPreds=allEp.filter(p=>String(p.user_id)===my&&p.points!=null&&!isBankEv(p));
 
   // ── 1. Ты единственный угадал X (матчи + события плей-офф) ──
   let unique=null;
   const epByEvent={};
-  allEp.forEach(p=>{if(p.points==null)return;(epByEvent[p.event_id]=epByEvent[p.event_id]||[]).push(p);});
+  allEp.forEach(p=>{if(p.points==null||isBankEv(p))return;(epByEvent[p.event_id]=epByEvent[p.event_id]||[]).push(p);});
   Object.keys(epByEvent).forEach(evId=>{
     const rows=epByEvent[evId];
     const mine=rows.find(r=>String(r.user_id)===my&&Number(r.points)>0);
@@ -2263,6 +2454,26 @@ function computeAllFacts(allPreds,allEp,evById,matchById){
   // ── 10. Сложная сборная ──
   if(hardTeam&&hardTeam!==bestTeam&&teamPts[hardTeam]<0)
     facts.push({icon:'😤',text:'Труднее всего давались матчи <b>'+hardTeam+'</b>: '+Math.round(teamPts[hardTeam]*10)/10+' очков ('+teamCnt[hardTeam]+' ставок)'});
+
+  // ── БАНК-МАТЧИ: отдельный факт на каждый (3-е место, финал) ──
+  Object.keys(matchById).forEach(mid=>{
+    const m=matchById[mid];
+    if(!m||!m.is_bankroll)return;
+    const mine=allEp.filter(p=>{
+      if(String(p.user_id)!==my||p.stake==null)return false;
+      const ev=evById[p.event_id];return ev&&String(ev.match_id)===String(mid);
+    });
+    if(!mine.length)return;
+    const totalStake=mine.reduce((s,p)=>s+Number(p.stake||0),0);
+    const scored=mine.filter(p=>p.points!=null);
+    if(scored.length===mine.length&&scored.length>0){
+      const net=scored.reduce((s,p)=>s+Number(p.points),0);
+      const netStr=net>0?'<b>+'+Math.round(net*10)/10+'</b> 🎉':net<0?'<b>'+Math.round(net*10)/10+'</b> 😅':'<b>0</b>';
+      facts.push({icon:'🎰',text:(m.title||'Банк-матч')+' ('+m.team1+' — '+m.team2+'): поставил '+totalStake+' очков, итог '+netStr});
+    } else {
+      facts.push({icon:'🎰',text:(m.title||'Банк-матч')+' ('+m.team1+' — '+m.team2+'): на кону <b>'+totalStake+'</b> очков в '+mine.length+' ставках — ждём результата!'});
+    }
+  });
 
   return facts;
 }
