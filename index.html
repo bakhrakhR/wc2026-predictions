@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1038,11 +1039,9 @@ function buildBankrollCard(m,locked,dlTxt,dlCls){
 
   let banner='';
   if(!locked){
-    // Сумма уже введённых ставок по этому матчу
-    let placed=0;
-    (evs||[]).forEach(ev=>{const pk=eventPicks[ev.id];if(pk&&pk.answer&&pk.stake)placed+=Number(pk.stake)||0;});
-    banner='<div class="bank-banner">💰 Твой банк: <b>'+myBankBase+'</b> очков · Макс на событие: <b>'+myBankMax+'</b>'+
-      ' · Поставлено тут: <b>'+placed+'</b><br>Угадал — ставка плюсом, ошибся — минусом. Пропуск = 0.</div>';
+    banner='<div class="bank-banner">💰 Твой банк: <b>'+myBankBase+'</b><br>'+
+      'Максимальная ставка на событие: <b>'+myBankMax+'</b><br>'+
+      'Угадал — ставка с плюсом, не угадал — штраф с минусом</div>';
   }
 
   let eventsHtml='';
